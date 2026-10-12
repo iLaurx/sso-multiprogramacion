@@ -1,0 +1,47 @@
+{
+  "simulacion_id": "demo-001",
+  "estado": "running",
+  "reloj": 2,
+  "lote_actual": 1,
+  "lotes_pendientes": 1,
+  "total_trabajos": 4,
+  "en_ejecucion": {
+    "id": 1,
+    "lote": 1,
+    "estado": "running",
+    "operacion": "+",
+    "operando_a": 8,
+    "operando_b": 3,
+    "tme": 7,
+    "ejecutado": 2,
+    "restante": 5,
+    "resultado": null
+  },
+  "en_espera": [
+    {
+      "id": 2,
+      "lote": 1,
+      "estado": "ready",
+      "operacion": "*",
+      "operando_a": 4,
+      "operando_b": 2,
+      "tme": 10,
+      "ejecutado": 0,
+      "restante": 10,
+      "resultado": null
+    },
+    {
+      "id": 3,
+      "lote": 1,
+      "estado": "ready",
+      "operacion": "%",
+      "operando_a": 9,
+      "operando_b": 4,
+      "tme": 8,
+      "ejecutado": 0,
+      "restante": 8,
+      "resultado": null
+    }
+  ],
+  "terminados": []
+}
