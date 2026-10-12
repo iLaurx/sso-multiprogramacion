@@ -1,0 +1,46 @@
+{
+  "estado": "running",
+  "reloj": 0,
+  "lote_actual": 1,
+  "lotes_pendientes": 1,
+  "total_trabajos": 4,
+  "en_ejecucion": {
+    "id": 1,
+    "lote": 1,
+    "estado": "running",
+    "operacion": "*",
+    "operando_a": -77,
+    "operando_b": 97,
+    "tme": 7,
+    "ejecutado": 0,
+    "restante": 7,
+    "resultado": null
+  },
+  "en_espera": [
+    {
+      "id": 2,
+      "lote": 1,
+      "estado": "ready",
+      "operacion": "*",
+      "operando_a": -72,
+      "operando_b": -90,
+      "tme": 13,
+      "ejecutado": 0,
+      "restante": 13,
+      "resultado": null
+    },
+    {
+      "id": 3,
+      "lote": 1,
+      "estado": "ready",
+      "operacion": "%",
+      "operando_a": 44,
+      "operando_b": -14,
+      "tme": 13,
+      "ejecutado": 0,
+      "restante": 13,
+      "resultado": null
+    }
+  ],
+  "terminados": []
+}
