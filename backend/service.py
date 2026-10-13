@@ -71,7 +71,17 @@ class SimulationService:
                 registro.motor.tick()
 
     async def close(self):
-        for registro in self.simulaciones.values():
-            if registro.task and not registro.task.done():
-                registro.task.cancel()
+        tareas = [
+            registro.task
+            for registro in self.simulaciones.values()
+            if registro.task is not None
+        ]
+
+        for tarea in tareas:
+            if not tarea.done():
+                tarea.cancel()
+
+        if tareas:
+            await asyncio.gather(*tareas, return_exceptions=True)
+
         self.simulaciones.clear()
