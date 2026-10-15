@@ -1,14 +1,237 @@
+
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
-  <title>SSO - Multiprogramación</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SSO - Multiprogramación por lotes</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f1f5f9;
+      color: #172033;
+    }
+
+    header {
+      background: #172554;
+      color: white;
+      padding: 24px;
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+    }
+
+    header p {
+      margin: 0;
+      color: #bfdbfe;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 24px auto;
+      padding: 0 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .panel {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px #00000010;
+      min-width: 0;
+    }
+
+    .controles {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    input, button {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+
+    input {
+      border: 1px solid #cbd5e1;
+      width: 130px;
+    }
+
+    button {
+      border: 0;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .estado {
+      font-weight: bold;
+    }
+
+    .listas {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .proceso {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 8px 0;
+      overflow-wrap: anywhere;
+    }
+
+    
+#escena {
+  width: 100%;
+  min-width: 0;
+  height: 350px;
+  min-height: 350px;
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: #111827;
+  border-radius: 12px;
+}
+
+#escena canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+
+    kbd {
+      background: #e2e8f0;
+      padding: 3px 7px;
+      border-radius: 4px;
+      color: #172033;
+    }
+
+    @media (max-width: 750px) {
+      .grid, .listas {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
+
 <body>
-  <h1>Simulación por lotes</h1>
-  <p id="estado">Comprobando API...</p>
-  <script src="/app.js"></script>
+  <header>
+    <h1>SSO: Multiprogramación por lotes</h1>
+    <p>Simulador visual de procesos del sistema operativo</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Conexión con el servidor</h2>
+      <p id="estadoApi" class="estado">Comprobando API...</p>
+    </section>
+
+    <section class="panel" style="margin-top: 16px">
+      <h2>Nueva simulación</h2>
+
+      <div class="controles">
+        <label for="numeroTrabajos">Número de trabajos:</label>
+        <input
+          type="number"
+          id="numeroTrabajos"
+          min="1"
+          step="1"
+          value="4"
+        >
+        <button id="btnIniciar">Iniciar simulación</button>
+      </div>
+
+      <p id="mensaje" role="status" aria-live="polite">
+        Esperando para iniciar.
+      </p>
+    </section>
+
+    <section class="grid" style="margin-top: 16px">
+      <article class="panel">
+        <h2>Estado de simulación</h2>
+        <p>Estado: <strong id="estadoSimulacion">Sin iniciar</strong></p>
+        <p>Reloj: <strong id="reloj">0</strong> segundos</p>
+        <p>Lote actual: <strong id="loteActual">—</strong></p>
+        <p>Lotes pendientes: <strong id="lotesPendientes">0</strong></p>
+      </article>
+
+      <article class="panel">
+        <h2>Controles</h2>
+        <p><kbd>I</kbd> Interrumpir proceso</p>
+        <p><kbd>E</kbd> Terminar proceso por error</p>
+        <p><kbd>P</kbd> Pausar simulación</p>
+        <p><kbd>C</kbd> Continuar simulación</p>
+        <p id="estadoControles">Inicia una simulación para habilitar los controles.</p>
+      </article>
+    </section>
+
+    <section class="panel" style="margin-top: 16px">
+      <h2>Proceso en ejecución</h2>
+      <div id="procesoActual">
+        <p>No hay procesos en ejecución.</p>
+      </div>
+    </section>
+
+    <section class="listas">
+      <article class="panel">
+        <h2>Procesos en espera</h2>
+        <div id="procesosEspera">
+          <p>No hay datos.</p>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>Procesos terminados</h2>
+        <div id="procesosTerminados">
+          <p>No hay datos.</p>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>Información</h2>
+        <p>Total de trabajos: <strong id="totalTrabajos">0</strong></p>
+        <p>Los tiempos se obtendrán del servidor.</p>
+      </article>
+    </section>
+
+    <section class="panel" style="margin-top: 16px">
+      <h2>Visualización con Three.js</h2>
+      <div id="escena"></div>
+      <p>Espacio reservado para representar los procesos en 3D.</p>
+    </section>
+  </main>
+
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="/visualizacion.js"></script>
+<script src="/app.js"></script>
+
 </body>
 </html>
