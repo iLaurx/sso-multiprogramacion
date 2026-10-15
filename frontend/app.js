@@ -9,6 +9,7 @@ const elementos = {
   apiDot: document.querySelector("#apiDot"),
   numeroTrabajos: document.querySelector("#numeroTrabajos"),
   btnIniciar: document.querySelector("#btnIniciar"),
+  btnIniciarEmulacion: document.querySelector("#btnIniciarEmulacion"),
   mensaje: document.querySelector("#mensaje"),
   reloj: document.querySelector("#reloj"),
   loteActual: document.querySelector("#loteActual"),
@@ -37,6 +38,7 @@ const elementos = {
 let simulacionId = sessionStorage.getItem("simulacion_id");
 let snapshotActual = null;
 let ocupado = false;
+let colaPeticiones = Promise.resolve();
 let temporizador = null;
 let procesoCpuAnterior = null;
 let historialLog = [];
@@ -92,6 +94,10 @@ async function solicitar(ruta, opciones = {}) {
 
   const datos = await respuesta.json().catch(() => ({}));
   if (!respuesta.ok) {
+    if (respuesta.status === 404 && ruta.startsWith("/simulations/")) {
+      limpiarSimulacion();
+      throw { detail: "La simulación ya no existe. Inicia una nueva." };
+    }
     throw datos;
   }
   return datos;
@@ -294,7 +300,7 @@ function renderizar(snapshot) {
   // Actualizar métricas superiores
   if (elementos.reloj) elementos.reloj.textContent = snapshot.reloj;
   if (elementos.loteActual) {
-    const totalLotes = Math.ceil(snapshot.total_trabajos / 4) || 1;
+    const totalLotes = Math.ceil(snapshot.total_trabajos / 3);
     elementos.loteActual.textContent = snapshot.lote_actual !== null ? `${snapshot.lote_actual} / ${totalLotes}` : `— / ${totalLotes}`;
   }
   if (elementos.lotesPendientes) elementos.lotesPendientes.textContent = snapshot.lotes_pendientes;
@@ -352,7 +358,7 @@ function renderizar(snapshot) {
     }
   }
 
-  elementos.btnIniciar.disabled = ocupado || isRunning || isPaused;
+  actualizarBotonesInicio();
 }
 
 // ==========================================
@@ -363,6 +369,19 @@ function detenerConsultas() {
     clearTimeout(temporizador);
     temporizador = null;
   }
+}
+
+function limpiarSimulacion() {
+  detenerConsultas();
+  sessionStorage.removeItem("simulacion_id");
+  simulacionId = null;
+  procesoCpuAnterior = null;
+  renderizar({
+    estado: "sin iniciar", reloj: 0, lote_actual: null,
+    lotes_pendientes: 0, total_trabajos: 0,
+    en_ejecucion: null, en_espera: [], terminados: []
+  });
+  snapshotActual = null;
 }
 
 function programarConsulta() {
@@ -385,19 +404,26 @@ function programarConsulta() {
   }, 1000);
 }
 
-async function ejecutarExclusivo(trabajo) {
-  if (ocupado) return;
-  ocupado = true;
-  elementos.btnIniciar.disabled = true;
+function actualizarBotonesInicio() {
+  const deshabilitado = ocupado || snapshotActual?.estado === "running" || snapshotActual?.estado === "paused";
+  elementos.btnIniciar.disabled = deshabilitado;
+  elementos.btnIniciarEmulacion.disabled = deshabilitado;
+}
 
-  try {
-    await trabajo();
-  } finally {
-    ocupado = false;
-    elementos.btnIniciar.disabled =
-      snapshotActual?.estado === "running" ||
-      snapshotActual?.estado === "paused";
-  }
+function ejecutarExclusivo(trabajo) {
+  const tarea = colaPeticiones.then(async () => {
+    ocupado = true;
+    actualizarBotonesInicio();
+
+    try {
+      await trabajo();
+    } finally {
+      ocupado = false;
+      actualizarBotonesInicio();
+    }
+  });
+  colaPeticiones = tarea.catch(() => {});
+  return tarea;
 }
 
 async function iniciarSimulacion() {
@@ -456,6 +482,7 @@ async function ejecutarAccion(accion) {
   };
 
   await ejecutarExclusivo(async () => {
+    if (!simulacionId || !snapshotActual) return;
     const datos = await solicitar(
       `/simulations/${encodeURIComponent(simulacionId)}/actions`,
       {
@@ -540,13 +567,13 @@ document.querySelectorAll(".btn-ctrl").forEach(btn => {
 });
 
 // Click en botón Generar / Iniciar
-if (elementos.btnIniciar) {
-  elementos.btnIniciar.addEventListener("click", () => {
+[elementos.btnIniciar, elementos.btnIniciarEmulacion].forEach(boton => {
+  boton.addEventListener("click", () => {
     iniciarSimulacion().catch(error => {
       mostrarMensaje(`Error: ${mostrarError(error)}`);
     });
   });
-}
+});
 
 // ==========================================
 // 6. Recuperación e Inicialización

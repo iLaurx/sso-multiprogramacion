@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Una CPU. Distintos turnos. · SSO Multiprogramación</title>
+  <title>Multiprogramación por lotes</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -168,15 +168,6 @@
 
     input[type="number"]:focus {
       border-color: var(--cyan);
-    }
-
-    .speed-badge {
-      background: var(--bg-input);
-      border: 1px solid var(--border-color);
-      color: var(--text-muted);
-      font-size: 13px;
-      padding: 9px 16px;
-      border-radius: 2px;
     }
 
     .config-note {
@@ -642,51 +633,6 @@
     .data-table td.res-green { color: var(--green); font-weight: 700; }
     .data-table td.res-red { color: var(--pink); font-weight: 700; }
 
-    /* Tarjetas de Guía / Educativas (Imagen 2 inferior) */
-    .guidance-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    .guide-box {
-      background: var(--bg-panel);
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .guide-tag {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .guide-tag.green { color: var(--green); }
-    .guide-tag.cyan { color: var(--cyan); }
-
-    .guide-steps {
-      padding-left: 18px;
-      font-size: 13px;
-      color: var(--text-muted);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .guide-steps li strong {
-      color: #ffffff;
-    }
-
-    .guide-text {
-      font-size: 13px;
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
     /* Historial Desplegable */
     .history-section {
       background: var(--bg-panel);
@@ -738,8 +684,7 @@
     /* Responsividad */
     @media (max-width: 900px) {
       .metrics-row,
-      .tables-row,
-      .guidance-row {
+      .tables-row {
         grid-template-columns: 1fr;
       }
       .blueprint-grid {
@@ -762,11 +707,11 @@
       <div class="hero-top-row">
         <div>
           <h1 class="hero-title">
-            Una CPU.<br>
-            <span class="hero-subtitle">Distintos turnos.</span>
+            Multiprogramación<br>
+            <span class="hero-subtitle">por lotes</span>
           </h1>
           <p class="hero-desc">
-            Sigue cada proceso desde la cola hasta su resultado. Interrumpe uno y observa cómo otro toma la CPU, sin perder el trabajo que ya realizó.
+            Simulador de procesos con operaciones aritméticas organizados en lotes. Consulta la cola de espera, los tiempos de ejecución y los resultados de cada trabajo.
           </p>
         </div>
         <div class="api-pill">
@@ -790,14 +735,10 @@
             <span>Generar / reiniciar</span>
           </button>
 
-          <div class="config-field">
-            <span class="config-label">Velocidad</span>
-            <div class="speed-badge">1x · tiempo real</div>
-          </div>
         </div>
 
         <div class="config-note">
-          datos aleatorios · TME de 7 a 18 s · máximo 4 por lote
+          datos aleatorios · TME de 7 a 18 s · máximo 3 por lote
         </div>
 
         <div id="mensaje" role="status" aria-live="polite">
@@ -893,6 +834,10 @@
 
       <!-- Barra de Botones de Control con Teclas Rápidas -->
       <div class="controls-bar">
+        <button id="btnIniciarEmulacion" class="btn-ctrl cyan-btn" type="button">
+          Iniciar emulación
+        </button>
+
         <button id="btnInterrupt" class="btn-ctrl pink-btn" data-action="interrupt" title="Interrumpir proceso actual (E/S)">
           <kbd>I</kbd> Interrumpir I/E
         </button>
@@ -916,7 +861,7 @@
 
     <!-- Banner de Actividad en Vivo (Imagen 2) -->
     <div id="bannerActividad" class="activity-banner">
-      <div id="bannerTexto">Sistema listo. Inicia una simulación con "Generar / reiniciar".</div>
+      <div id="bannerTexto">Sistema listo. Elige la cantidad de trabajos y pulsa "Iniciar emulación".</div>
     </div>
 
     <!-- Tablas en Paralelo (Imagen 2) -->
@@ -970,25 +915,6 @@
       </div>
     </section>
 
-    <!-- Bloques de Guía y Explicación (Imagen 2) -->
-    <section class="guidance-row">
-      <div class="guide-box">
-        <div class="guide-tag green">PRUÉBALO PASO A PASO</div>
-        <ol class="guide-steps">
-          <li>Observa cómo avanza el tiempo transcurrido en el proceso en CPU y se descuenta del restante.</li>
-          <li>Pulsa <strong>C</strong> para continuar y luego <strong>I</strong>: el proceso vuelve al final de la cola conservando su avance.</li>
-          <li>Pulsa <strong>E</strong> para terminar el proceso actual con <strong>ERROR</strong>. Con <strong>P</strong> puedes detener el reloj y revisar los datos.</li>
-        </ol>
-      </div>
-
-      <div class="guide-box">
-        <div class="guide-tag cyan">¿QUÉ CAMBIA RESPECTO A LA OTRA VISTA?</div>
-        <p class="guide-text">
-          Aquí los lotes agrupan los programas con operaciones aritméticas variadas. Una sola CPU ejecuta un proceso a la vez; al interrumpirlo, otro puede tomar su turno. Agrupar trabajos no significa ejecutarlos todos simultáneamente, sino mantener disponible una cola organizada para maximizar el uso del procesador.
-        </p>
-      </div>
-    </section>
-
     <!-- Historial Desplegable de Eventos -->
     <section class="history-section">
       <details>
@@ -1006,7 +932,7 @@
 
     <!-- Pie de Página -->
     <footer>
-      modelo educativo basado en la actividad 4: multiprogramación por lotes. I: devuelve el proceso a la cola del lote actual; conserva lo ejecutado. E: sale por error. El reloj cuenta segundos simulados sincronizados con el servidor.
+      Made in "El X"
     </footer>
   </div>
 
