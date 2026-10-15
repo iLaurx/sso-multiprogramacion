@@ -1,237 +1,1015 @@
-
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SSO - Multiprogramación por lotes</title>
+  <title>Una CPU. Distintos turnos. · SSO Multiprogramación</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 
   <style>
+    :root {
+      --bg-main: #0a0e1a;
+      --bg-panel: #0d1424;
+      --bg-card: #10192e;
+      --bg-input: #0b1120;
+      --border-color: #1e2d4a;
+      --border-subtle: #162238;
+      --cyan: #22d3ee;
+      --cyan-glow: rgba(34, 211, 238, 0.25);
+      --pink: #f43f5e;
+      --pink-glow: rgba(244, 63, 94, 0.25);
+      --green: #4ade80;
+      --green-glow: rgba(74, 222, 128, 0.25);
+      --amber: #fbbf24;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-mono: 'Space Mono', 'JetBrains Mono', Consolas, monospace;
+    }
+
     * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
 
     body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f1f5f9;
-      color: #172033;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      padding: 32px 24px;
+      line-height: 1.6;
+      min-height: 100vh;
     }
 
-    header {
-      background: #172554;
-      color: white;
-      padding: 24px;
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
     }
 
-    header h1 {
-      margin: 0 0 8px;
+    /* Iconos Vectoriales SVG */
+    .icon-svg {
+      display: inline-block;
+      vertical-align: middle;
+      flex-shrink: 0;
     }
 
-    header p {
-      margin: 0;
-      color: #bfdbfe;
-    }
-
-    main {
-      max-width: 1200px;
-      margin: 24px auto;
-      padding: 0 16px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Encabezado Principal */
+    .hero-header {
+      display: flex;
+      flex-direction: column;
       gap: 16px;
     }
 
-    .panel {
-      background: white;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 2px 8px #00000010;
-      min-width: 0;
-    }
-
-    .controles {
+    .hero-top-row {
       display: flex;
-      gap: 10px;
+      justify-content: space-between;
+      align-items: flex-start;
       flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .hero-title {
+      font-size: 38px;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -1px;
+      color: #ffffff;
+    }
+
+    .hero-subtitle {
+      color: var(--cyan);
+    }
+
+    .hero-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      max-width: 700px;
+      margin-top: 10px;
+    }
+
+    .api-pill {
+      display: inline-flex;
       align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: 4px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
     }
 
-    input, button {
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 15px;
+    .api-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
     }
 
-    input {
-      border: 1px solid #cbd5e1;
-      width: 130px;
+    .api-dot.online {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
     }
 
+    .api-dot.error {
+      background: var(--pink);
+      box-shadow: 0 0 8px var(--pink);
+    }
+
+    /* Barra de Configuración */
+    .config-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      padding: 20px 24px;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .config-controls-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .config-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .config-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="number"] {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 700;
+      padding: 8px 14px;
+      width: 100px;
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type="number"]:focus {
+      border-color: var(--cyan);
+    }
+
+    .speed-badge {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 13px;
+      padding: 9px 16px;
+      border-radius: 2px;
+    }
+
+    .config-note {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    #mensaje {
+      font-size: 12px;
+      color: var(--text-muted);
+      border-top: 1px dashed var(--border-subtle);
+      padding-top: 8px;
+    }
+
+    /* Botones Generales */
     button {
-      border: 0;
-      background: #2563eb;
-      color: white;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 9px 18px;
+      border-radius: 2px;
       cursor: pointer;
-    }
-
-    button:hover {
-      background: #1d4ed8;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+      user-select: none;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
     }
 
     button:disabled {
-      opacity: 0.5;
+      opacity: 0.35;
       cursor: not-allowed;
+      border-color: var(--border-subtle) !important;
+      color: var(--text-dim) !important;
+      box-shadow: none !important;
+      transform: none !important;
     }
 
-    .estado {
-      font-weight: bold;
+    .btn-generate {
+      background: #111d33;
+      border: 1px solid #25406b;
+      color: #ffffff;
     }
 
-    .listas {
+    .btn-generate:hover:not(:disabled) {
+      background: #172a4d;
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    /* Cuadrícula de Métricas Superiores */
+    .metrics-row {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, 1fr);
       gap: 16px;
-      margin-top: 16px;
     }
 
-    .proceso {
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 12px;
-      margin: 8px 0;
-      overflow-wrap: anywhere;
-    }
-
-    
-#escena {
-  width: 100%;
-  min-width: 0;
-  height: 350px;
-  min-height: 350px;
-  display: block;
-  position: relative;
-  overflow: hidden;
-  background: #111827;
-  border-radius: 12px;
-}
-
-#escena canvas {
-  display: block;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-
-    kbd {
-      background: #e2e8f0;
-      padding: 3px 7px;
+    .metric-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      padding: 16px 20px;
       border-radius: 4px;
-      color: #172033;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
-    @media (max-width: 750px) {
-      .grid, .listas {
+    .metric-title {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .metric-value.green {
+      color: var(--green);
+    }
+
+    .metric-value.cyan {
+      color: var(--cyan);
+    }
+
+    /* Diagrama Principal: Blueprint Flow */
+    .diagram-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .diagram-tag {
+      font-size: 11px;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .diagram-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .diagram-subtitle {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* Lienzo con Cuadrícula Blueprint */
+    .blueprint-grid {
+      background-color: #080c16;
+      background-image:
+        linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 36px 28px;
+      display: grid;
+      grid-template-columns: 1fr auto 1.4fr auto 1.1fr;
+      align-items: center;
+      gap: 16px;
+      min-height: 220px;
+    }
+
+    .col-header {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+    }
+
+    .col-header.pink { color: var(--pink); }
+    .col-header.cyan { color: var(--cyan); }
+    .col-header.green { color: var(--green); }
+
+    /* Tarjetas de Cola (Rosa/Magenta) */
+    .cola-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .cola-card {
+      border: 2px solid var(--pink);
+      background: rgba(244, 63, 94, 0.06);
+      padding: 12px 16px;
+      border-radius: 3px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      width: 130px;
+      box-shadow: 0 0 10px rgba(244, 63, 94, 0.15);
+    }
+
+    .cola-card-title {
+      color: var(--pink);
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .cola-card-time {
+      color: var(--text-main);
+      font-size: 13px;
+    }
+
+    /* Flechas / Chevrons animadas */
+    .flow-chevrons {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      display: flex;
+      align-items: center;
+      user-select: none;
+    }
+
+    .flow-chevrons.pink { color: var(--pink); }
+    .flow-chevrons.green { color: var(--green); }
+
+    /* Animación de trabajo en las flechas */
+    .flow-chevrons.working span {
+      animation: chevronPulse 1s infinite alternate;
+    }
+    .flow-chevrons.working span:nth-child(2) { animation-delay: 0.2s; }
+    .flow-chevrons.working span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes chevronPulse {
+      0% { opacity: 0.2; transform: translateX(0); }
+      100% { opacity: 1; transform: translateX(3px); }
+    }
+
+    /* Caja Central de CPU (Cyan) */
+    .cpu-box {
+      border: 2px solid var(--cyan);
+      background: rgba(34, 211, 238, 0.05);
+      border-radius: 4px;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 0 18px var(--cyan-glow);
+      position: relative;
+    }
+
+    /* Animación activa cuando la CPU está procesando */
+    .cpu-box.working {
+      box-shadow: 0 0 26px rgba(34, 211, 238, 0.45);
+      animation: cpuWorkingPulse 2s infinite ease-in-out;
+    }
+
+    @keyframes cpuWorkingPulse {
+      0%, 100% {
+        border-color: var(--cyan);
+        box-shadow: 0 0 18px var(--cyan-glow);
+      }
+      50% {
+        border-color: #67e8f9;
+        box-shadow: 0 0 32px rgba(103, 232, 249, 0.55);
+      }
+    }
+
+    .cpu-proc-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: 0.5px;
+    }
+
+    .cpu-proc-op {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 1px;
+    }
+
+    .cpu-proc-time {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    .cpu-progress-track {
+      width: 100%;
+      height: 6px;
+      background: #142036;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .cpu-progress-fill {
+      height: 100%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      transition: width 0.3s linear;
+      width: 0%;
+    }
+
+    /* Tarjetas de Terminados (Verde/Lima) */
+    .terminados-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .terminado-card {
+      border: 1.5px solid var(--green);
+      background: rgba(74, 222, 128, 0.05);
+      padding: 8px 14px;
+      border-radius: 3px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--green);
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.15);
+    }
+
+    .terminado-card.error {
+      border-color: var(--pink);
+      color: var(--pink);
+      background: rgba(244, 63, 94, 0.05);
+      box-shadow: 0 0 8px rgba(244, 63, 94, 0.15);
+    }
+
+    /* Detalles y Reglas bajo el Diagrama */
+    .diagram-footer-text {
+      font-size: 13px;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 12px;
+    }
+
+    .execution-detail-line {
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #080c16;
+      padding: 10px 16px;
+      border-radius: 3px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .square-indicator {
+      color: var(--cyan);
+      font-size: 10px;
+    }
+
+    /* Barra de Botones de Control */
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .btn-ctrl {
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+
+    .btn-ctrl kbd {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      padding: 2px 6px;
+      font-size: 11px;
+      margin-right: 6px;
+    }
+
+    .btn-ctrl.pink-btn {
+      border-color: var(--pink);
+      color: var(--pink);
+      background: rgba(244, 63, 94, 0.08);
+    }
+    .btn-ctrl.pink-btn:hover:not(:disabled) {
+      background: rgba(244, 63, 94, 0.2);
+      box-shadow: 0 0 12px var(--pink-glow);
+    }
+
+    .btn-ctrl.cyan-btn {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: rgba(34, 211, 238, 0.08);
+    }
+    .btn-ctrl.cyan-btn:hover:not(:disabled) {
+      background: rgba(34, 211, 238, 0.2);
+      box-shadow: 0 0 12px var(--cyan-glow);
+    }
+
+    .btn-ctrl.pulsing {
+      transform: scale(0.95);
+      filter: brightness(1.4);
+    }
+
+    #estadoControles {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-left: auto;
+    }
+
+    /* Banner de Actividad en Vivo (Imagen 2) */
+    .activity-banner {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-left: 4px solid var(--cyan);
+      padding: 14px 20px;
+      border-radius: 3px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Tablas de Procesos (Dos Columnas, Imagen 2) */
+    .tables-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .table-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .table-tag {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .table-tag.cyan { color: var(--cyan); }
+    .table-tag.pink { color: var(--pink); }
+
+    .table-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .table-desc {
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    .data-table th {
+      text-align: left;
+      color: var(--text-dim);
+      font-weight: 500;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .data-table td {
+      padding: 10px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      color: var(--text-main);
+    }
+
+    .data-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .data-table td.res-green { color: var(--green); font-weight: 700; }
+    .data-table td.res-red { color: var(--pink); font-weight: 700; }
+
+    /* Tarjetas de Guía / Educativas (Imagen 2 inferior) */
+    .guidance-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .guide-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .guide-tag {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .guide-tag.green { color: var(--green); }
+    .guide-tag.cyan { color: var(--cyan); }
+
+    .guide-steps {
+      padding-left: 18px;
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .guide-steps li strong {
+      color: #ffffff;
+    }
+
+    .guide-text {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Historial Desplegable */
+    .history-section {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 14px 20px;
+    }
+
+    .history-summary {
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      user-select: none;
+    }
+
+    .history-summary:hover {
+      color: var(--cyan);
+    }
+
+    .history-content {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 180px;
+      overflow-y: auto;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .history-entry {
+      padding: 4px 0;
+      border-bottom: 1px dashed var(--border-subtle);
+    }
+
+    /* Pie de Página */
+    footer {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.6;
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 16px;
+    }
+
+    /* Responsividad */
+    @media (max-width: 900px) {
+      .metrics-row,
+      .tables-row,
+      .guidance-row {
         grid-template-columns: 1fr;
+      }
+      .blueprint-grid {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+      }
+      .flow-chevrons {
+        transform: rotate(90deg);
+        margin: 10px 0;
       }
     }
   </style>
 </head>
 
 <body>
-  <header>
-    <h1>SSO: Multiprogramación por lotes</h1>
-    <p>Simulador visual de procesos del sistema operativo</p>
-  </header>
-
-  <main>
-    <section class="panel">
-      <h2>Conexión con el servidor</h2>
-      <p id="estadoApi" class="estado">Comprobando API...</p>
-    </section>
-
-    <section class="panel" style="margin-top: 16px">
-      <h2>Nueva simulación</h2>
-
-      <div class="controles">
-        <label for="numeroTrabajos">Número de trabajos:</label>
-        <input
-          type="number"
-          id="numeroTrabajos"
-          min="1"
-          step="1"
-          value="4"
-        >
-        <button id="btnIniciar">Iniciar simulación</button>
+  <div class="container">
+    <!-- Encabezado Principal (Imagen 1) -->
+    <header class="hero-header">
+      <div class="hero-top-row">
+        <div>
+          <h1 class="hero-title">
+            Una CPU.<br>
+            <span class="hero-subtitle">Distintos turnos.</span>
+          </h1>
+          <p class="hero-desc">
+            Sigue cada proceso desde la cola hasta su resultado. Interrumpe uno y observa cómo otro toma la CPU, sin perder el trabajo que ya realizó.
+          </p>
+        </div>
+        <div class="api-pill">
+          <span id="apiDot" class="api-dot"></span>
+          <span id="estadoApi">API: comprobando...</span>
+        </div>
       </div>
 
-      <p id="mensaje" role="status" aria-live="polite">
-        Esperando para iniciar.
-      </p>
-    </section>
+      <!-- Barra de Configuración -->
+      <div class="config-box">
+        <div class="config-controls-row">
+          <div class="config-field">
+            <label class="config-label" for="numeroTrabajos">Trabajos iniciales</label>
+            <input type="number" id="numeroTrabajos" min="1" max="100" step="1" value="6">
+          </div>
 
-    <section class="grid" style="margin-top: 16px">
-      <article class="panel">
-        <h2>Estado de simulación</h2>
-        <p>Estado: <strong id="estadoSimulacion">Sin iniciar</strong></p>
-        <p>Reloj: <strong id="reloj">0</strong> segundos</p>
-        <p>Lote actual: <strong id="loteActual">—</strong></p>
-        <p>Lotes pendientes: <strong id="lotesPendientes">0</strong></p>
-      </article>
+          <button id="btnIniciar" class="btn-generate">
+            <svg class="icon-svg" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            <span>Generar / reiniciar</span>
+          </button>
 
-      <article class="panel">
-        <h2>Controles</h2>
-        <p><kbd>I</kbd> Interrumpir proceso</p>
-        <p><kbd>E</kbd> Terminar proceso por error</p>
-        <p><kbd>P</kbd> Pausar simulación</p>
-        <p><kbd>C</kbd> Continuar simulación</p>
-        <p id="estadoControles">Inicia una simulación para habilitar los controles.</p>
-      </article>
-    </section>
+          <div class="config-field">
+            <span class="config-label">Velocidad</span>
+            <div class="speed-badge">1x · tiempo real</div>
+          </div>
+        </div>
 
-    <section class="panel" style="margin-top: 16px">
-      <h2>Proceso en ejecución</h2>
-      <div id="procesoActual">
-        <p>No hay procesos en ejecución.</p>
+        <div class="config-note">
+          datos aleatorios · TME de 7 a 18 s · máximo 4 por lote
+        </div>
+
+        <div id="mensaje" role="status" aria-live="polite">
+          Esperando para iniciar simulación.
+        </div>
+      </div>
+    </header>
+
+    <!-- Métricas Superiores (Imagen 1) -->
+    <section class="metrics-row">
+      <div class="metric-card">
+        <span class="metric-title">RELOJ GENERAL</span>
+        <div class="metric-value green"><span id="reloj">0</span> s</div>
+      </div>
+
+      <div class="metric-card">
+        <span class="metric-title">LOTE ACTUAL</span>
+        <div class="metric-value"><span id="loteActual">—</span></div>
+      </div>
+
+      <div class="metric-card">
+        <span class="metric-title">LOTES PENDIENTES</span>
+        <div class="metric-value"><span id="lotesPendientes">0</span></div>
+      </div>
+
+      <div class="metric-card">
+        <span class="metric-title">TERMINADOS</span>
+        <div class="metric-value"><span id="metricTerminados">0</span> / <span id="totalTrabajos">0</span></div>
       </div>
     </section>
 
-    <section class="listas">
-      <article class="panel">
-        <h2>Procesos en espera</h2>
-        <div id="procesosEspera">
-          <p>No hay datos.</p>
-        </div>
-      </article>
+    <!-- Diagrama Principal: Blueprint Flow (Imagen 1) -->
+    <section class="diagram-panel">
+      <div>
+        <div class="diagram-tag">COLA → CPU → RESULTADOS</div>
+        <h2 class="diagram-title">Multiprogramación por lotes</h2>
+        <p class="diagram-subtitle">Los procesos entran por ID. El siguiente lote entra cuando termina todo el actual.</p>
+      </div>
 
-      <article class="panel">
-        <h2>Procesos terminados</h2>
-        <div id="procesosTerminados">
-          <p>No hay datos.</p>
+      <div class="blueprint-grid">
+        <!-- Columna 1: Cola del Lote Actual -->
+        <div>
+          <div class="col-header pink">COLA DEL LOTE ACTUAL</div>
+          <div id="procesosEspera" class="cola-container">
+            <div style="font-size: 12px; color: var(--text-dim);">Cola vacía.</div>
+          </div>
         </div>
-      </article>
 
-      <article class="panel">
-        <h2>Información</h2>
-        <p>Total de trabajos: <strong id="totalTrabajos">0</strong></p>
-        <p>Los tiempos se obtendrán del servidor.</p>
-      </article>
+        <!-- Chevrons 1 -->
+        <div id="chevronsIn" class="flow-chevrons pink">
+          <span>&gt;</span><span>&gt;</span><span>&gt;</span>
+        </div>
+
+        <!-- Columna 2: Una Sola CPU -->
+        <div>
+          <div class="col-header cyan">UNA SOLA CPU</div>
+          <div id="procesoActual" class="cpu-box">
+            <div class="cpu-proc-title">CPU LIBRE</div>
+            <div class="cpu-proc-op">—</div>
+            <div class="cpu-proc-time">Esperando proceso...</div>
+            <div class="cpu-progress-track">
+              <div class="cpu-progress-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chevrons 2 -->
+        <div id="chevronsOut" class="flow-chevrons green">
+          <span>&gt;</span><span>&gt;</span><span>&gt;</span>
+        </div>
+
+        <!-- Columna 3: Terminados -->
+        <div>
+          <div class="col-header green">TERMINADOS</div>
+          <div id="terminadosDiagrama" class="terminados-container">
+            <div style="font-size: 12px; color: var(--text-dim);">Sin terminados.</div>
+          </div>
+          <!-- Contenedor oculto para compatibilidad con selectores de pruebas -->
+          <div id="procesosTerminados" style="display: none;"></div>
+        </div>
+      </div>
+
+      <div class="diagram-footer-text">
+        I: regresa a la cola y conserva lo ejecutado. E: sale por error.
+      </div>
+
+      <!-- Detalle de Ejecución en Línea -->
+      <div class="execution-detail-line">
+        <span class="square-indicator">■</span>
+        <span style="font-weight: 700; color: #ffffff;">en ejecución</span>
+        <span id="detalleEjecucion" style="color: var(--text-muted); margin-left: 6px;">—</span>
+      </div>
+
+      <!-- Barra de Botones de Control con Teclas Rápidas -->
+      <div class="controls-bar">
+        <button id="btnInterrupt" class="btn-ctrl pink-btn" data-action="interrupt" title="Interrumpir proceso actual (E/S)">
+          <kbd>I</kbd> Interrumpir I/E
+        </button>
+
+        <button id="btnError" class="btn-ctrl pink-btn" data-action="error" title="Terminar proceso actual por error">
+          <kbd>E</kbd> Error
+        </button>
+
+        <button id="btnPause" class="btn-ctrl cyan-btn" data-action="pause" title="Pausar simulación">
+          <kbd>P</kbd> Pausa
+        </button>
+
+        <button id="btnContinue" class="btn-ctrl cyan-btn" data-action="continue" title="Continuar simulación">
+          <kbd>C</kbd> Continuar
+        </button>
+
+        <span id="estadoControles">Inicia una simulación para habilitar los controles.</span>
+        <div id="estadoSimulacion" style="display: none;">sin iniciar</div>
+      </div>
     </section>
 
-    <section class="panel" style="margin-top: 16px">
-      <h2>Visualización con Three.js</h2>
-      <div id="escena"></div>
-      <p>Espacio reservado para representar los procesos en 3D.</p>
+    <!-- Banner de Actividad en Vivo (Imagen 2) -->
+    <div id="bannerActividad" class="activity-banner">
+      <div id="bannerTexto">Sistema listo. Inicia una simulación con "Generar / reiniciar".</div>
+    </div>
+
+    <!-- Tablas en Paralelo (Imagen 2) -->
+    <section class="tables-row">
+      <!-- Tabla Izquierda: Procesos del Lote Actual -->
+      <div class="table-box">
+        <div class="table-tag cyan">SIGUE LOS TIEMPOS</div>
+        <h3 class="table-title">Procesos del lote actual</h3>
+        <p class="table-desc">La cola y el proceso en CPU están en el diagrama. Aquí puedes revisar todo el lote.</p>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Estado</th>
+              <th>Operación</th>
+              <th>TME</th>
+              <th>Usado</th>
+              <th>Restante</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyLoteActual">
+            <tr>
+              <td colspan="6" style="color: var(--text-dim); text-align: center; padding: 20px;">Sin datos de lote.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Tabla Derecha: Trabajos Terminados -->
+      <div class="table-box">
+        <div class="table-tag pink">SALIDA DE TODOS LOS LOTES</div>
+        <h3 class="table-title">Trabajos terminados</h3>
+        <p class="table-desc">Un error termina el proceso inmediatamente y no produce un resultado.</p>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Lote</th>
+              <th>Operación</th>
+              <th>Resultado</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyTerminados">
+            <tr>
+              <td colspan="4" style="color: var(--text-dim); text-align: center; padding: 20px;">Todavía no hay trabajos terminados.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
-  </main>
 
+    <!-- Bloques de Guía y Explicación (Imagen 2) -->
+    <section class="guidance-row">
+      <div class="guide-box">
+        <div class="guide-tag green">PRUÉBALO PASO A PASO</div>
+        <ol class="guide-steps">
+          <li>Observa cómo avanza el tiempo transcurrido en el proceso en CPU y se descuenta del restante.</li>
+          <li>Pulsa <strong>C</strong> para continuar y luego <strong>I</strong>: el proceso vuelve al final de la cola conservando su avance.</li>
+          <li>Pulsa <strong>E</strong> para terminar el proceso actual con <strong>ERROR</strong>. Con <strong>P</strong> puedes detener el reloj y revisar los datos.</li>
+        </ol>
+      </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="/visualizacion.js"></script>
-<script src="/app.js"></script>
+      <div class="guide-box">
+        <div class="guide-tag cyan">¿QUÉ CAMBIA RESPECTO A LA OTRA VISTA?</div>
+        <p class="guide-text">
+          Aquí los lotes agrupan los programas con operaciones aritméticas variadas. Una sola CPU ejecuta un proceso a la vez; al interrumpirlo, otro puede tomar su turno. Agrupar trabajos no significa ejecutarlos todos simultáneamente, sino mantener disponible una cola organizada para maximizar el uso del procesador.
+        </p>
+      </div>
+    </section>
 
+    <!-- Historial Desplegable de Eventos -->
+    <section class="history-section">
+      <details>
+        <summary class="history-summary">
+          <svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          <span>Historial de movimientos · últimos 30 eventos</span>
+        </summary>
+        <div id="historialEventos" class="history-content">
+          <div class="history-entry">[0s] Sistema inicializado.</div>
+        </div>
+      </details>
+    </section>
+
+    <!-- Pie de Página -->
+    <footer>
+      modelo educativo basado en la actividad 4: multiprogramación por lotes. I: devuelve el proceso a la cola del lote actual; conserva lo ejecutado. E: sale por error. El reloj cuenta segundos simulados sincronizados con el servidor.
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
 </body>
 </html>
