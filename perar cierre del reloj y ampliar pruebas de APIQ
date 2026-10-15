@@ -1,0 +1,170 @@
+[1mdiff --git a/backend/service.py b/backend/service.py[m
+[1mindex 516126f..8d8070c 100644[m
+[1m--- a/backend/service.py[m
+[1m+++ b/backend/service.py[m
+[36m@@ -71,7 +71,17 @@[m [mclass SimulationService:[m
+                 registro.motor.tick()[m
+ [m
+     async def close(self):[m
+[31m-        for registro in self.simulaciones.values():[m
+[31m-            if registro.task and not registro.task.done():[m
+[31m-                registro.task.cancel()[m
+[32m+[m[32m        tareas = [[m
+[32m+[m[32m            registro.task[m
+[32m+[m[32m            for registro in self.simulaciones.values()[m
+[32m+[m[32m            if registro.task is not None[m
+[32m+[m[32m        ][m
+[32m+[m
+[32m+[m[32m        for tarea in tareas:[m
+[32m+[m[32m            if not tarea.done():[m
+[32m+[m[32m                tarea.cancel()[m
+[32m+[m
+[32m+[m[32m        if tareas:[m
+[32m+[m[32m            await asyncio.gather(*tareas, return_exceptions=True)[m
+[32m+[m
+         self.simulaciones.clear()[m
+\ No newline at end of file[m
+[1mdiff --git a/tests/test_api.py b/tests/test_api.py[m
+[1mindex 0dce29c..69483bc 100644[m
+[1m--- a/tests/test_api.py[m
+[1m+++ b/tests/test_api.py[m
+[36m@@ -1,3 +1,5 @@[m
+[32m+[m[32mimport pytest[m
+[32m+[m
+ from fastapi.testclient import TestClient[m
+ from backend.main import create_app[m
+ [m
+[36m@@ -12,4 +14,100 @@[m [mdef test_crear_y_consultar_simulacion():[m
+ [m
+         res_get = client.get(f"/api/simulations/{sim_id}")[m
+         assert res_get.status_code == 200[m
+[31m-        assert res_get.json()["simulacion_id"] == sim_id[m
+\ No newline at end of file[m
+[32m+[m[32m        assert res_get.json()["simulacion_id"] == sim_id[m
+[32m+[m
+[32m+[m[32m@pytest.mark.parametrize("cantidad", [0, -1, 2.5, 2.0, True, "3"])[m
+[32m+[m[32mdef test_rechaza_cantidades_invalidas(cantidad):[m
+[32m+[m[32m    with TestClient(create_app(auto_clock=False)) as client:[m
+[32m+[m[32m        respuesta = client.post([m
+[32m+[m[32m            "/api/simulations",[m
+[32m+[m[32m            json={"numero_trabajos": cantidad},[m
+[32m+[m[32m        )[m
+[32m+[m[32m        assert respuesta.status_code == 422[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef test_id_inexistente():[m
+[32m+[m[32m    with TestClient(create_app(auto_clock=False)) as client:[m
+[32m+[m[32m        assert client.get("/api/simulations/no-existe").status_code == 404[m
+[32m+[m
+[32m+[m[32m        respuesta = client.post([m
+[32m+[m[32m            "/api/simulations/no-existe/actions",[m
+[32m+[m[32m            json={"accion": "pause"},[m
+[32m+[m[32m        )[m
+[32m+[m[32m        assert respuesta.status_code == 404[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef test_consultar_no_avanza_el_reloj():[m
+[32m+[m[32m    with TestClient(create_app(auto_clock=False)) as client:[m
+[32m+[m[32m        inicial = client.post([m
+[32m+[m[32m            "/api/simulations",[m
+[32m+[m[32m            json={"numero_trabajos": 3, "seed": 123},[m
+[32m+[m[32m        ).json()[m
+[32m+[m
+[32m+[m[32m        ruta = f"/api/simulations/{inicial['simulacion_id']}"[m
+[32m+[m
+[32m+[m[32m        for _ in range(5):[m
+[32m+[m[32m            assert client.get(ruta).json() == inicial[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef test_acciones_y_estados():[m
+[32m+[m[32m    with TestClient(create_app(auto_clock=False)) as client:[m
+[32m+[m[32m        inicial = client.post([m
+[32m+[m[32m            "/api/simulations",[m
+[32m+[m[32m            json={"numero_trabajos": 3, "seed": 123},[m
+[32m+[m[32m        ).json()[m
+[32m+[m
+[32m+[m[32m        ruta = f"/api/simulations/{inicial['simulacion_id']}/actions"[m
+[32m+[m
+[32m+[m[32m        respuesta = client.post(ruta, json={"accion": "pause"})[m
+[32m+[m[32m        assert respuesta.status_code == 200[m
+[32m+[m[32m        assert respuesta.json()["estado"] == "paused"[m
+[32m+[m
+[32m+[m[32m        for accion in ("interrupt", "error"):[m
+[32m+[m[32m            respuesta = client.post(ruta, json={"accion": accion})[m
+[32m+[m[32m            assert respuesta.status_code == 409[m
+[32m+[m
+[32m+[m[32m        respuesta = client.post(ruta, json={"accion": "continue"})[m
+[32m+[m[32m        assert respuesta.status_code == 200[m
+[32m+[m[32m        assert respuesta.json()["estado"] == "running"[m
+[32m+[m
+[32m+[m[32m        respuesta = client.post(ruta, json={"accion": "interrupt"})[m
+[32m+[m[32m        assert respuesta.status_code == 200[m
+[32m+[m[32m        estado = respuesta.json()[m
+[32m+[m[32m        assert estado["en_ejecucion"]["id"] == 2[m
+[32m+[m[32m        assert [p["id"] for p in estado["en_espera"]] == [3, 1][m
+[32m+[m[32m        assert estado["reloj"] == 0[m
+[32m+[m
+[32m+[m[32m        respuesta = client.post(ruta, json={"accion": "error"})[m
+[32m+[m[32m        assert respuesta.status_code == 200[m
+[32m+[m[32m        estado = respuesta.json()[m
+[32m+[m[32m        terminado = estado["terminados"][-1][m
+[32m+[m[32m        assert terminado["id"] == 2[m
+[32m+[m[32m        assert terminado["estado"] == "error"[m
+[32m+[m[32m        assert terminado["resultado"] is None[m
+[32m+[m[32m        assert terminado["restante"] == 0[m
+[32m+[m[32m        assert estado["reloj"] == 0[m
+[32m+[m
+[32m+[m[32m        # Terminar los dos procesos restantes mediante E.[m
+[32m+[m[32m        for _ in range(2):[m
+[32m+[m[32m            assert client.post([m
+[32m+[m[32m                ruta, json={"accion": "error"}[m
+[32m+[m[32m            ).status_code == 200[m
+[32m+[m
+[32m+[m[32m        for accion in ("interrupt", "error", "pause", "continue"):[m
+[32m+[m[32m            respuesta = client.post(ruta, json={"accion": accion})[m
+[32m+[m[32m            assert respuesta.status_code == 409[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef test_rechaza_accion_desconocida():[m
+[32m+[m[32m    with TestClient(create_app(auto_clock=False)) as client:[m
+[32m+[m[32m        inicial = client.post([m
+[32m+[m[32m            "/api/simulations",[m
+[32m+[m[32m            json={"numero_trabajos": 1},[m
+[32m+[m[32m        ).json()[m
+[32m+[m
+[32m+[m[32m        respuesta = client.post([m
+[32m+[m[32m            f"/api/simulations/{inicial['simulacion_id']}/actions",[m
+[32m+[m[32m            json={"accion": "reiniciar"},[m
+[32m+[m[32m        )[m
+[32m+[m[32m        assert respuesta.status_code == 422[m
+\ No newline at end of file[m
+[1mdiff --git a/tests/test_service.py b/tests/test_service.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..3929f70[m
+[1m--- /dev/null[m
+[1m+++ b/tests/test_service.py[m
+[36m@@ -0,0 +1,23 @@[m
+[32m+[m[32mimport asyncio[m
+[32m+[m
+[32m+[m[32mfrom backend.service import SimulationService[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef test_cierre_termina_las_tareas_del_reloj():[m
+[32m+[m[32m    async def comprobar():[m
+[32m+[m[32m        servicio = SimulationService(auto_clock=True)[m
+[32m+[m[32m        estado = await servicio.create(3, seed=123)[m
+[32m+[m
+[32m+[m[32m        registro = servicio.simulaciones[estado["simulacion_id"]][m
+[32m+[m[32m        tarea = registro.task[m
+[32m+[m
+[32m+[m[32m        # Permitir que la tarea del reloj comience.[m
+[32m+[m[32m        await asyncio.sleep(0)[m
+[32m+[m
+[32m+[m[32m        await servicio.close()[m
+[32m+[m
+[32m+[m[32m        assert tarea.done()[m
+[32m+[m[32m        assert tarea.cancelled()[m
+[32m+[m[32m        assert servicio.simulaciones == {}[m
+[32m+[m
+[32m+[m[32m    asyncio.run(comprobar())[m
+\ No newline at end of file[m

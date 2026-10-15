@@ -1,7 +1,7 @@
 # SSO - Multiprogramación por lotes
 
-Base común para la Actividad 4 / Programa 2. Por ahora sirve la página inicial
-y `GET /api/health`; el motor y los controles de simulación están pendientes.
+Simulador web para la Actividad 4 / Programa 2. Incluye motor de lotes,
+API con reloj del servidor e interfaz con controles y resultados.
 
 ## Preparar el proyecto en Windows
 
@@ -52,14 +52,30 @@ Si PowerShell bloquea la activación, usar el comando con la ruta completa de
 Python; no hace falta cambiar la política del sistema. No abrir `index.html`
 con doble clic. Para la demo final, omitir `--reload` y usar un solo worker.
 
-## Comprobar la base
+## Usar la simulación
+
+Introduce una cantidad entera positiva y pulsa **Iniciar emulación**.
+Los trabajos se generan automáticamente, con TME de 7 a 18 segundos y
+lotes de hasta **3 procesos**.
+
+- **I:** envía el proceso al final de la cola del lote y conserva su avance.
+- **E:** termina el proceso con ERROR.
+- **P:** pausa la simulación.
+- **C:** continúa la simulación pausada.
+
+También puedes usar los botones. Las consultas y acciones se atienden en orden;
+una acción espera si hay una petición en curso. Al terminar se conservan los
+resultados y se habilita el inicio de otra simulación.
+
+## Comprobar el proyecto
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Las pruebas verifican la ruta health y que se sirvan la página y su JavaScript.
-Todavía no prueban una simulación.
+Las pruebas cubren el motor, validaciones y acciones de la API, cierre del
+servicio, ruta health y entrega de HTML/JavaScript. Las pruebas de archivos
+estáticos no verifican la interacción en un navegador.
 
 ## Archivos y responsabilidades
 
@@ -74,13 +90,13 @@ Todavía no prueban una simulación.
 | `requirements.in` | Dependencias directas. |
 | `requirements.txt` | Versiones instalables compartidas, incluidas las indirectas. |
 
-Los archivos del motor, rutas de simulación, estilos, evidencias y reporte se
-agregan al implementar sus fases; no hacen falta archivos vacíos para el arranque.
+El motor, las rutas y la interfaz ya están implementados. Las evidencias y el
+reporte final se preparan como parte de la entrega académica.
 
 ## Trabajo con ramas
 
-Integrar primero esta base en `main`, preferentemente mediante un PR revisado.
-Después, cada integrante actualiza su copia y crea una rama para su tarea:
+Cada integrante actualiza su copia y crea una rama para su tarea.
+Los cambios se integran en `main` mediante un PR revisado:
 
 ```powershell
 git switch main
@@ -100,10 +116,14 @@ Después de recibir cambios que modifiquen dependencias, volver a instalar
 .\.venv\Scripts\python.exe -m pip freeze | Set-Content -Encoding utf8 requirements.txt
 ```
 
-## Alcance pendiente
+## Límites
 
-La futura simulación usará lotes de hasta tres trabajos y teclas **I**
-(interrumpir), **E** (error), **P** (pausar) y **C** (continuar).
-Estas funciones aún no están implementadas. El diseño propuesto conserva el
-estado en memoria: reiniciar el servidor lo borrará. No requiere base de datos
-ni Node.js.
+El estado se conserva en memoria y requiere un solo worker. Recargar el navegador
+recupera la simulación mediante su ID en `sessionStorage`. Reiniciar el servidor
+elimina las simulaciones; cuando la interfaz recibe un 404, limpia el estado y
+permite iniciar otra sin recargar la página.
+
+Los errores temporales durante las consultas muestran un aviso y se reintentan.
+La recuperación al cargar la página todavía descarta el ID si falla la petición.
+No hay caducidad de simulaciones ni límite de trabajos validado por la API.
+La aplicación no requiere base de datos ni Node.js para ejecutarse.
