@@ -1,4 +1,4 @@
-"""Motor de multiprogramación por lotes, independiente del servidor."""
+"""Motor FCFS de la actividad 6, independiente del servidor."""
 
 # * Expone las clases públicas para importarlas directamente desde simulation.
 from .engine import SimulationEngine, SimulationStateError

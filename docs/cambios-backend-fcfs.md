@@ -2,6 +2,14 @@
 
 Guía del motor implementado de **Sistemas Operativos**. Describe el código actual de `simulation/`, no una propuesta. Sustituye las reglas de lotes de `contrato-api.md` para integrar FCFS. No se modificaron API ni frontend en este paso.
 
+## Por dónde empezar en API
+
+1. Usar esta guía y sus cuatro snapshots como referencia del motor. `fcfs.md` describe el plan; `contrato-api.md` y su JSON corresponden a lotes y no son el esquema vigente.
+2. Revisar el recorrido ya existente: rutas → servicio → `SimulationEngine`. Mantener `simulacion_id` en el servicio y el reloj bajo su control; GET solo consulta. El motor no necesita un segundo planificador ni un reloj adicional.
+3. Revisar los esquemas de respuesta o consumidores del equipo: quitar campos de lotes, admitir `new`/`blocked`, tiempos con null y `en_ejecucion: null` aun en running. No traducir null a cero. Las listas conservan el orden recibido.
+4. Comprobar las acciones con los nombres HTTP actuales: `interrupt` → `interrupt()`, `error` → `fail()`, `pause` → `pause()` y `continue` → `resume()`. Con todos bloqueados, I/E deben producir conflicto, sin cerrar la simulación ni impedir P/C.
+5. Actualizar el contrato y probar el reloj del servicio con CPU libre, pausa y desbloqueo; después coordinar la adaptación de la pantalla. No usar `Process` directamente para crear trabajos durante una simulación.
+
 ## Métodos disponibles
 
 Se importa con `from simulation import SimulationEngine, SimulationStateError`.
@@ -13,7 +21,7 @@ Se importa con `from simulation import SimulationEngine, SimulationStateError`.
 | `interrupt()` | I: mueve la CPU a blocked durante 10 segundos simulados. Conserva servicio y memoria; despacha al siguiente listo. No avanza el reloj. |
 | `fail()` | E: termina la CPU como error, registra finalización, conserva servicio real y resultado None. Libera memoria y admite al siguiente nuevo. No avanza el reloj. |
 | `pause()` / `resume()` | P/C: detienen todo o continúan. Repetir P en pausa o C en running es válido. En completed generan SimulationStateError. |
-| `snapshot()` | Devuelve un diccionario nuevo serializable a JSON, sin ticks ni cambios de estado. Las acciones anteriores devuelven None: consultar después con este método. |
+| `snapshot()` | Devuelve un diccionario nuevo serializable a JSON, sin ticks ni cambios de estado. tick/I/E/P/C devuelven None: consultar después con este método. create devuelve el motor. |
 | `memoria_ocupada` | Propiedad entera: listos + CPU + bloqueados, entre 0 y 3. |
 
 I/E generan `SimulationStateError` en pausa, al finalizar o si no hay CPU activa. Con todos bloqueados el estado sigue running, I/E se rechazan y P/C siguen disponibles. El motor no espera segundos reales ni depende de FastAPI; el servicio llama tick y controla la concurrencia.
@@ -301,7 +309,21 @@ motor.snapshot()
 }
 ```
 
-## Implementado y pendiente de integración
+## Resultado de la revisión de entrega
+
+Revisión del 3 de noviembre de 2026 en `feature/fcfs`, con el árbol limpio al comenzar. No se encontraron fallos funcionales del motor en los casos comprobados, por lo que no se cambió su lógica ni su contrato. Se corrigió la descripción del paquete `simulation`, que todavía lo llamaba motor de lotes.
+
+Se añadieron 15 secuencias reproducibles en `tests/test_fcfs_handoff.py`, con cantidades 1, 2, 3, 4 y 7 y semillas 0, 7 y 123. Después de cada control se comprueban procesos únicos y completos, capacidad de memoria, estados, tiempos sin reinicios y la igualdad `tiempo desde llegada = servicio + espera + bloqueo`, también antes de terminar. Incluyen controles rechazados, pausas y cierre tras dejar de interrumpir. El reloj total se contrasta con servicio global más CPU ociosa.
+
+Comando de pruebas del motor:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests/test_engine.py tests/test_models.py tests/test_times.py tests/test_snapshot_fcfs.py tests/test_fcfs_handoff.py
+```
+
+Resultado: **79 pruebas del motor aprobadas**. La suite completa con `-m pytest -q` dio **94 aprobadas**, incluidas las pruebas existentes de API y servicio. Los cuatro JSON de esta guía se reprodujeron y compararon exactamente contra el motor. Persisten avisos de permisos de caché de pytest y, en la suite completa, de deprecación Starlette/HTTPX; no son fallos de simulación.
+
+## Motor terminado e incompatibilidades anteriores
 
 Implementado y probado en el motor: FCFS, admisión continua, tres residentes contando bloqueados, I durante 10 segundos, E con servicio real, P/C completos, reloj con CPU libre, cierre correcto, tiempos y snapshots independientes serializables.
 
@@ -309,4 +331,14 @@ El servicio actual de `backend/service.py` ya utiliza el motor y transmite su sn
 
 Pendiente: revisar formalmente la integración y su documentación de API con este esquema, adaptar la pantalla de lotes y probar el recorrido visual. La pantalla actual espera lote_actual, lotes_pendientes y lote; esos campos ya no se devuelven. No debe calcular tiempos localmente. La aprobación de las pruebas del motor/API no acredita esa adaptación visual. README y los ejemplos antiguos de contrato-api siguen pendientes de actualización en su etapa correspondiente.
 
-No se agregaron funciones de actividad 8, creación de procesos durante ejecución ni controles N/B. Commit local autorizado por el usuario; no se hizo push ni despliegue.
+| Situación | Diagnóstico para API |
+| --- | --- |
+| Ya no hay lote, lote_actual ni lotes_pendientes | Cambio intencional de contrato FCFS; corregir consumidores anteriores. No implica que falte un lote en el motor. |
+| CPU null con running y bloqueados presentes | Estado válido. El servicio debe seguir llamando tick; no usar CPU null como condición de final. |
+| I no devuelve el proceso a listos inmediatamente | Comportamiento correcto de actividad 6: bloqueo de 10 segundos, con memoria ocupada. |
+| I/E sin CPU activa devuelven SimulationStateError | Rechazo esperado; las rutas actuales lo traducen a HTTP 409. No es un fallo de desbloqueo. |
+| resultado null con estado error | Contrato conservado: presentar ERROR a partir del estado. No reemplazar servicio por TME. |
+| Bloqueos simultáneos o coincidentes con finalización | Orden definido en esta guía, probado en el motor; no reordenar desde API. |
+| lote permanece dentro de Process/generador | Compatibilidad interna temporal sin efecto funcional ni exposición pública. No es trabajo pendiente para consumir snapshot. |
+
+No hay un fallo conocido del motor que bloquee la entrega en el alcance revisado. Quedan la revisión de integración HTTP, su documentación y la validación visual; no se declaran completadas por estas pruebas. No se modificaron API, servicio ni frontend. No se agregaron funciones de actividad 8. Commit de la entrega autorizado por el usuario; no se hizo despliegue.

@@ -2,27 +2,35 @@
 
 Última actualización: 3 de noviembre de 2026.
 
-## Dónde estamos
+## Entrega del motor
 
-Actividad 6 de **Sistemas Operativos**, rama comprobada `feature/fcfs`. Motor FCFS con tres residentes, bloqueo de 10 segundos, tiempos y salida pública preparados para revisar la integración. Se conservaron los cambios locales de tiempos de la etapa anterior. Commit local autorizado por el usuario para todos los cambios pendientes de tiempos, snapshot y guía FCFS. No se hizo push ni despliegue.
+**Motor FCFS de la actividad 6 de Sistemas Operativos terminado para entregar a API en el alcance revisado.** Rama comprobada: `feature/fcfs`; árbol limpio al comenzar. No se encontraron fallos funcionales en los casos comprobados. Commit de la entrega autorizado por el usuario. El push a origin/feature/fcfs requiere verificación del destino por revisión automática. No se hizo despliegue.
 
-## Qué quedó hecho
+Quedaron comprobados procesos y operaciones, nuevos y listos FCFS, admisión continua, máximo tres residentes contando CPU y bloqueados, I de 10 segundos, E con servicio real, pausa completa, reloj con CPU libre y cierre solo al terminar todos. Llegada se registra al admitir a memoria; primera atención no se reinicia; finalización, retorno, respuesta y espera respetan `fcfs.md`. Servicio y bloqueo se cuentan por separado.
 
-- `simulation/models.py`: `Process.snapshot()` expone llegada, primera atención, finalización, retorno, respuesta, espera, bloqueo acumulado e inicio del bloqueo actual. Conserva identidad, operación, operandos, TME, ejecutado como servicio real, restante, resultado y estado. Elimina `lote` de la salida; permanece internamente por compatibilidad con el constructor y generador, sin uso en la planificación.
-- `simulation/engine.py`: snapshot con nuevos, listos mediante `en_espera`, CPU, bloqueados, terminados y memoria ocupada. No devuelve campos de lotes. Las entradas de bloqueados agregan `bloqueo_transcurrido` y `bloqueo_restante` del bloqueo actual, calculados desde el reloj sin modificar el motor. `bloqueado` sigue siendo el acumulado entre bloqueos.
-- Se conservan los tiempos ya implementados: llegada al admitir, primera atención solo al primer despacho, finalización normal o por error, espera solo en listos, servicio real y bloqueo separado. Retorno/respuesta se calculan sin contadores duplicados; instantes desconocidos se devuelven como null.
-- `docs/cambios-backend-fcfs.md`: guía de métodos, campos conservados/agregados/eliminados, reglas de reloj, errores, cuatro ejemplos completos generados por el motor y pendientes de integración.
-- `tests/test_models.py` y `tests/test_times.py`: contrato adaptado a los tiempos públicos y eliminación de lote. `tests/test_snapshot_fcfs.py`: bloqueos repetidos, pausa, copias independientes, tiempos finales conocidos y reproducción exacta de los JSON de la guía. Se mantienen las pruebas de tiempos de la etapa anterior.
+`snapshot()` devuelve colas, CPU, terminados, memoria y tiempos, sin campos de lotes. Se verificaron null para instantes desconocidos, JSON serializable, copias independientes y consultas sin avance. Los bloqueados incluyen duración actual y restante además del acumulado.
+
+## Qué se cambió en esta revisión
+
+- `tests/test_fcfs_handoff.py`: 15 secuencias mixtas reproducibles que comprueban identidad y conservación de procesos, capacidad, estados, partición de tiempos, primera atención estable, pausas, controles rechazados y finalización.
+- `simulation/__init__.py`: descripción corregida de lotes a FCFS. No fue necesario cambiar la lógica ni el snapshot del motor.
+- `docs/cambios-backend-fcfs.md`: entrega con métodos, esquema, cuatro ejemplos reales verificados, resultados de pruebas, punto de entrada para API y distinción entre fallos de motor e incompatibilidades del contrato anterior.
+- Este archivo: estado vigente de la entrega.
 
 ## Comprobaciones
 
-- Se revisaron AGENTS.md, fcfs.md, estado previo, README, motor, modelo, generador, servicio y contrato anterior.
-- `.\.venv\Scripts\python.exe -m pytest -q`: **79 pruebas aprobadas**, incluidas API y servicio. Avisos de deprecación Starlette/HTTPX y permisos de caché de pytest; sin fallos.
-- Se comprobaron JSON serializable, ausencia de campos de lotes, copias que no alteran el motor, consultas sin avance, pausa de datos internos y públicos, bloqueo actual separado del acumulado y tiempos de casos conocidos. Los cuatro ejemplos documentados coinciden con el motor usando seed 123.
+- Pruebas específicas de motor (`test_engine.py`, `test_models.py`, `test_times.py`, `test_snapshot_fcfs.py` y `test_fcfs_handoff.py`): **79 aprobadas**.
+- Suite completa `.\.venv\Scripts\python.exe -m pytest -q`: **94 aprobadas**, incluidas las pruebas existentes de API/servicio.
+- Los cuatro snapshots de la guía coinciden exactamente con las secuencias ejecutadas en el motor con seed 123. Las pruebas de casos conocidos y bloqueos simultáneos, escalonados y repetidos siguen pasando.
+- Persisten avisos de permisos de caché de pytest y de deprecación Starlette/HTTPX en la suite completa. No hubo fallos. La validación visual y el recorrido HTTP completo con reloj real no se realizaron en esta revisión.
 
-## Coordinación y siguiente paso
+## Por dónde empieza el compañero de API
 
-- No se editaron `backend/` ni `frontend/`. El servicio existente ya llama al motor, agrega `simulacion_id` y transmite el snapshot: sus respuestas reflejan automáticamente este esquema. `contrato-api.md` está desactualizado, incluso al afirmar que solo health está implementado.
-- Revisar la integración y documentación de API con [la guía nueva](docs/cambios-backend-fcfs.md); después adaptar la pantalla y comprobar el recorrido visual. La pantalla sigue esperando lote, lote_actual y lotes_pendientes; todavía no representa correctamente FCFS. README y ejemplos anteriores también requieren actualización en su etapa.
-- No queda una función del motor solicitada en este paso pendiente. La integración formal y validación visual no se dan por terminadas con las pruebas automatizadas.
-- Se mantiene el plan de `fcfs.md`; solo actividad 6, sin implementar ni preparar actividad 8.
+1. Leer [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md), especialmente los métodos, el esquema y los ejemplos. No tomar `docs/contrato-api.md` ni su JSON anterior como contrato FCFS.
+2. Revisar el recorrido ya conectado en rutas y servicio: este agrega `simulacion_id` y transmite snapshot. Actualizar documentación y consumidores que todavía dependan de campos de lotes; admitir estados new/blocked, tiempos null y CPU null con running.
+3. Verificar mapeo interrupt/error/pause/continue a interrupt/fail/pause/resume, conflictos I/E sin CPU y reloj que continúa con bloqueados pero se congela en pausa. No recalcular tiempos ni planificar en API.
+4. Después coordinar frontend y probar el recorrido completo. La pantalla todavía espera lotes; no se considera adaptada por pasar la suite.
+
+No queda un fallo conocido del motor que impida esta entrega. La permanencia interna de `lote` en Process/generador es compatibilidad temporal sin uso en FCFS ni exposición pública. README y contrato anterior siguen pendientes de actualización por sus áreas.
+
+No se modificaron API, servicio ni frontend. No se cambió el plan de `fcfs.md` ni se implementó o preparó actividad 8.
