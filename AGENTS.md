@@ -6,6 +6,7 @@ Este proyecto se está adaptando de multiprogramación por lotes a FCFS para la 
 
 1. Lee [fcfs.md](fcfs.md): explica qué vamos a integrar y qué queremos conservar.
 2. Lee [estado.md](estado.md): indica qué está hecho, qué falta y cuál es el siguiente paso.
+   Para continuar la integración, lee también [docs/entrega-motor.md](docs/entrega-motor.md) y [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md).
 3. Revisa la rama y los cambios locales con `git status` y `git branch --show-current`. La rama compartida prevista es `feature/fcfs`; no asumas que sigues en ella.
 4. Revisa el código y las pruebas del área que vas a tocar. Consulta también el [README](README.md) para ejecutar el proyecto.
 
@@ -29,7 +30,11 @@ La petición actual del usuario define qué paso debes hacer. Leer los pendiente
 
 Estos límites ayudan a coordinarse. No cambies archivos de otra área por iniciativa propia si el paso solicitado no lo necesita. Si una corrección depende de otra parte, explica qué falta para conectarla.
 
-Primero se adaptará el motor. Cuando esté listo y comprobado, se preparará una guía para API con los métodos, campos y ejemplos reales. Los cambios previstos en `fcfs.md` todavía no son un contrato final. `docs/contrato-api.md` y sus ejemplos describen la versión anterior y deben revisarse contra el código antes de usarlos.
+El motor FCFS ya está terminado y revisado. Su contrato Python y los ejemplos reales están en [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md). El siguiente trabajo corresponde a integración de API/servicio y después frontend, según [docs/entrega-motor.md](docs/entrega-motor.md). Las rutas y el servicio ya existen: revisarlos y completar las pruebas necesarias, sin reconstruirlos ni duplicar el motor.
+
+[docs/contrato-api.md](docs/contrato-api.md) documenta las rutas actuales y cómo reciben el snapshot FCFS; su validación de integración pendiente se indica allí. `docs/contrato-api.json` y `docs/fixtures/motor-inicial.json` son ejemplos históricos de lotes: no usarlos como contrato o fixture FCFS. Su reemplazo corresponde al paso de API. `Manual-instructions.md` conserva el manual histórico de actividad 4; no rige actividad 6.
+
+Al trabajar en API, preservar los tiempos que calcula el motor, el orden de las listas y los null. Una CPU libre no significa simulación terminada: puede haber bloqueados. No modificar `simulation/` salvo un fallo concreto reproducido y necesario para el paso solicitado.
 
 ## Al modificar y comprobar
 

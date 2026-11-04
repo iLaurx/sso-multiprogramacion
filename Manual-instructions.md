@@ -1,3 +1,5 @@
+> **Documento histórico de actividad 4.** Sus reglas de lotes, interrupciones, ramas y reparto inicial no son las instrucciones vigentes de actividad 6. Para continuar el proyecto, leer [AGENTS.md](AGENTS.md), [estado.md](estado.md) y [la entrega FCFS](docs/entrega-motor.md). Se conserva el manual original a continuación como antecedente.
+
 **SSO / ACTIVIDAD 4 / MANUAL DEL EQUIPO**
 
 **SEMINARIO DE SISTEMAS OPERATIVOS · ACTIVIDAD 4 · PROGRAMA 2**

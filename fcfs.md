@@ -2,7 +2,7 @@
 
 Vamos a adaptar el simulador que ya tenemos para la actividad 6 de **Sistemas Operativos**. Seguimos trabajando en el mismo proyecto: aprovecharemos el servidor, las operaciones, la comunicación con la API y buena parte de la pantalla.
 
-Este archivo explica lo que vamos a integrar. **Es un plan; los cambios todavía no están implementados.** El alcance es únicamente la actividad 6.
+Este archivo recoge las reglas y el plan de la actividad 6. **El motor FCFS ya está implementado y revisado; falta completar la integración y adaptar la pantalla.** El alcance es únicamente la actividad 6. El estado vigente está en [estado.md](estado.md), el contrato real del motor en [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md) y el trabajo por integrar en [docs/entrega-motor.md](docs/entrega-motor.md).
 
 ## ¿Qué cambia?
 
@@ -35,7 +35,7 @@ Cuando un proceso termina, entra el siguiente nuevo si hay alguno pendiente. Ya 
 | `P` | Pausa toda la simulación, incluidos reloj, ejecución y bloqueos. |
 | `C` | Continúa desde donde quedó. |
 
-Actualmente, `I` devuelve el proceso directamente a la cola. Ese comportamiento se reemplazará por el bloqueo de 10 segundos.
+En el motor actual, `I` ya bloquea durante 10 segundos simulados. El reencolado inmediato correspondía a la versión anterior de lotes.
 
 El reloj debe seguir avanzando si la CPU está libre pero quedan procesos bloqueados. La simulación termina cuando todos los procesos hayan terminado, incluidos los que salgan por error.
 
@@ -52,7 +52,7 @@ Además del TME, el tiempo ejecutado y el restante, necesitamos estos datos:
 | Espera | Tiempo acumulado en la cola de listos. |
 | Servicio | Tiempo que realmente ha usado la CPU; corresponde a `ejecutado`. |
 
-Estas definiciones de llegada y espera son el criterio que proponemos usar en el proyecto. El tiempo en nuevos queda fuera de esas mediciones y el bloqueo se cuenta aparte de la espera en listos.
+Estas definiciones de llegada y espera ya se aplican en el motor. El tiempo en nuevos queda fuera de esas mediciones y el bloqueo se cuenta aparte de la espera en listos.
 
 Si un proceso termina por error, guardaremos lo que alcanzó a ejecutarse; no completaremos artificialmente su TME. Los tiempos que todavía no se conozcan quedarán sin valor, no en cero.
 
@@ -62,17 +62,17 @@ Al finalizar se mostrará una tabla con los datos de todos los procesos, sus res
 
 ### Backend
 
-Aquí estará el cambio principal: reemplazar los lotes por las colas de nuevos, listos y bloqueados, controlar los tres espacios de memoria y calcular los tiempos.
+El motor ya reemplazó la planificación por lotes con las colas de nuevos, listos y bloqueados, controla los tres espacios de memoria y calcula los tiempos. `lote` permanece como metadato interno temporal por compatibilidad del constructor; no se usa para planificar ni se expone en snapshot.
 
 Conservaremos las operaciones aritméticas, los identificadores únicos, el TME aleatorio de 7 a 18 segundos y, donde siga teniendo sentido, los métodos actuales para crear, avanzar, interrumpir, terminar por error, pausar, continuar y consultar la simulación.
 
 ### API
 
-La idea es conservar las rutas actuales para crear la simulación, consultar su estado y aplicar acciones. La API seguirá conectando el motor con la pantalla y el servidor seguirá controlando el reloj.
+Las rutas actuales para crear la simulación, consultar su estado y aplicar acciones ya existen. El servicio transmite el snapshot del motor y agrega `simulacion_id`. La siguiente etapa debe verificar ese recorrido con el esquema FCFS, completar sus pruebas y mantener el reloj en el servidor.
 
-Mantendremos los campos que todavía sirven, como `reloj`, `en_ejecucion`, `terminados`, `tme`, `ejecutado` y `restante`. También podemos conservar `en_espera` para la cola de listos. Agregaremos los datos de nuevos, bloqueados, memoria y tiempos; los campos de lotes se retirarán.
+El snapshot conserva `reloj`, `en_ejecucion`, `terminados`, `tme`, `ejecutado`, `restante` y `en_espera` para la cola de listos. Ya incluye nuevos, bloqueados, memoria y tiempos; los campos públicos de lotes están retirados.
 
-**Cuando el backend esté listo, prepararemos una guía con los cambios reales**, los métodos disponibles y ejemplos de los datos que devuelve. Con eso se ajustará la API sin tener que adivinar cómo quedó el motor. Este documento todavía no fija el contrato final.
+La guía real ya está en [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md), con métodos y cuatro snapshots reproducibles. [docs/contrato-api.md](docs/contrato-api.md) describe la envoltura HTTP actual; los criterios de integración pendientes están en [docs/entrega-motor.md](docs/entrega-motor.md). Este plan no sustituye esos contratos.
 
 ### Frontend
 
@@ -94,11 +94,11 @@ Los tiempos se tomarán del servidor. La pantalla no llevará un reloj independi
 
 1. Conservar la versión de lotes mediante el tag y la release que ya se crearon.
 2. Trabajar en la rama compartida `feature/fcfs`, haciendo cambios pequeños y revisándolos por etapas.
-3. Preparar los datos de los procesos y después adaptar el motor a FCFS.
-4. Comprobar memoria, orden de ejecución, bloqueos, pausa, errores y tiempos.
-5. Documentar cómo quedó el backend y conectar la API con esos datos.
-6. Adaptar la pantalla y probar el recorrido completo.
+3. Modelo y motor FCFS: terminados.
+4. Memoria, orden de ejecución, bloqueos, pausa, errores, tiempos y snapshot: revisados con pruebas del motor.
+5. Guía del motor: terminada. Siguiente paso: verificar la integración de API/servicio, ampliar sus pruebas y reemplazar los fixtures de lotes.
+6. Pendiente: adaptar la pantalla y probar el recorrido completo con reloj real y evidencia.
 
-La aplicación quedará con un solo motor: FCFS. La versión anterior seguirá disponible en Git; no vamos a mantener un modo de lotes dentro de la web.
+El único motor actual es FCFS. La versión anterior se conserva en Git; no se mantendrá un modo de lotes dentro de la web. La pantalla todavía representa la versión anterior y necesita adaptación.
 
 Este archivo resume el cambio para que todos tengamos el mismo contexto. Los detalles de implementación se irán confirmando conforme terminemos y probemos cada parte.

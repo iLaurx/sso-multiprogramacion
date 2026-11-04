@@ -1,100 +1,81 @@
-# Entrega del integrante 1: motor de lotes
+# Entrega del motor y siguientes integraciones — Actividad 6
 
-## Archivos
+Punto de partida para el desarrollador de API. Materia: **Sistemas Operativos**. Rama compartida: `feature/fcfs`. La entrega del motor se publicó hasta `383a46f`; esta actualización documental es posterior y permanece local hasta que el usuario solicite compartirla.
 
-| Archivo | Función |
+## Orden de lectura
+
+[AGENTS.md](../AGENTS.md) → [estado.md](../estado.md) → este archivo → [contrato real del motor](cambios-backend-fcfs.md) → [contrato HTTP actual](contrato-api.md).
+
+Antes de trabajar, comprobar `git status` y `git branch --show-current`. Actualizar la copia sin sobrescribir cambios locales y coordinar archivos compartidos. No hacer commit, push, merge ni despliegue sin la petición del usuario.
+
+## Qué se recibe
+
+| Área | Estado | Responsabilidad siguiente |
+| --- | --- | --- |
+| Motor `simulation/` | Terminado y revisado: FCFS, colas, tres residentes, I de 10 segundos, E, P/C, tiempos y snapshot. | Conservar el contrato; corregir solo fallos concretos reproducidos. |
+| API `backend/routes.py`, `schemas.py` | Existen creación, consulta y acciones con validación y errores. | Verificar el esquema FCFS de extremo a extremo y documentarlo. |
+| Servicio `backend/service.py` | Ya conserva motores, reloj, exclusión mutua e ID externo; transmite snapshot. | Probar tiempos, bloqueos y concurrencia a través del servicio. No duplicar el planificador. |
+| Frontend `frontend/` | Todavía utiliza lotes y no representa FCFS correctamente. | Adaptar paneles, controles y tabla final después de fijar la integración HTTP. |
+| Documentación y fixtures | Guías Markdown actualizadas. Los dos JSON antiguos siguen siendo de lotes. | API debe sustituir esos fixtures por salidas reproducibles FCFS y revisar consumidores. |
+
+El import público sigue siendo `from simulation import SimulationEngine, SimulationStateError`. `create()` devuelve el motor; tick, interrupt, fail, pause y resume devuelven None. Consultar snapshot después de cada acción. Los métodos y cuatro ejemplos completos están en [cambios-backend-fcfs.md](cambios-backend-fcfs.md).
+
+El modelo/generador conservan `lote` internamente por compatibilidad. No afecta FCFS ni aparece en la respuesta: no es un bloqueo para integrar API.
+
+## Siguiente trabajo de API y servicio
+
+1. Revisar el código existente y sus pruebas antes de añadir componentes. Conservar las rutas de creación, GET y actions de [contrato-api.md](contrato-api.md).
+2. Comprobar que todas las respuestas mantienen las claves y valores del snapshot, añadiendo solo `simulacion_id`. Si se introducen modelos de respuesta, deben aceptar new/blocked, tiempos null, CPU null en running y los campos adicionales exclusivos de bloqueados.
+3. Mantener el mapa de acciones: interrupt → interrupt(), error → fail(), pause → pause(), continue → resume(). Traducir SimulationStateError a 409 y conservar 404/422 para los casos documentados.
+4. Mantener un único reloj del servidor y el mismo lock para tick, acciones y consultas. CPU null no es condición de parada: puede haber bloqueados. GET no avanza tiempo. El motor calcula tiempos y orden de colas.
+5. Ampliar pruebas deterministas con `SimulationService(auto_clock=False)` y `await servicio.tick_once(id)`; complementar con pruebas de la tarea automática controlando el tiempo, sin esperas largas. No exponer tick como endpoint público.
+6. Reemplazar o retirar de los consumidores `docs/contrato-api.json` y `docs/fixtures/motor-inicial.json`. Generar nuevos ejemplos desde el motor o servicio, indicar secuencia y comprobar su reproducción. No inventar IDs ni tiempos como evidencia.
+7. Revisar con frontend los campos definitivos y anotar resultados en estado.md. No devolver campos ficticios de lotes para mantener la pantalla anterior.
+
+## Criterios para cerrar API
+
+Pendientes de comprobar explícitamente en el servicio/HTTP, aunque sus reglas ya pasan en el motor:
+
+| Caso | Resultado esperado |
 | --- | --- |
-| `simulation/models.py` | Proceso, estados, tiempo restante y operaciones. |
-| `simulation/generator.py` | Datos aleatorios válidos y semilla local. |
-| `simulation/engine.py` | Lotes, cola, ticks y controles. |
-| `simulation/__init__.py` | Importación pública del motor y su excepción. |
-| `tests/conftest.py` | Trabajos conocidos para las pruebas. |
-| `tests/test_engine.py` | Pruebas de las reglas del motor. |
-| `docs/fixtures/motor-inicial.json` | Snapshot real de 4 trabajos con seed=123. |
+| Crear cuatro procesos con seed 123 | Memoria 3, uno en CPU, dos listos y uno nuevo; sin campos de lotes. |
+| Terminar CPU normalmente o con error | Nuevo admitido al final de listos inmediatamente; memoria nunca supera 3; servicio real preservado por error. |
+| Bloquear tres residentes | CPU null, estado running, memoria 3 y siguiente nuevo fuera de memoria. |
+| Avanzar desde ese bloqueo | Sigue el reloj sin CPU; a los 9 segundos permanecen bloqueados y a los 10 regresan en orden. No consumen servicio en el tick de desbloqueo. |
+| Pausar con CPU y/o bloqueados | Tras ticks del servicio no cambia reloj, servicio, espera ni bloqueo; continuar reanuda desde el mismo punto. |
+| Consultar repetidamente | Mismos datos sin avanzar; null permanece null y las listas conservan orden. |
+| Acciones inválidas para el estado | I/E sin CPU o en pausa: 409 sin cambios. P/C siguen disponibles con todos bloqueados. Tras completed se rechazan los controles. |
+| Finalizar todos | completed, memoria 0, CPU null y todas las listas activas vacías; terminados y tiempos conservados. |
+| Varias simulaciones y acceso concurrente | Sin cruces de IDs/tiempos ni ticks duplicados; acciones y consultas serializadas por simulación. |
+| Cerrar el servicio | Tareas canceladas y registros liberados; sin tareas huérfanas. |
 
-## Contrato Python para el integrante 2
+Usar casos de tiempos conocidos de `tests/test_times.py` para contrastar también la salida HTTP. Al terminar, registrar qué casos pasaron, qué archivos cambiaron y cualquier prueba que aún falte.
 
-```python
-from simulation import SimulationEngine, SimulationStateError
+## Integración posterior de frontend
 
-motor = SimulationEngine.create(numero_trabajos=4, seed=123)
-estado = motor.snapshot()
-```
-
-`create()` devuelve un motor en `running`, con reloj cero y el primer proceso
-despachado. La cantidad debe ser un entero positivo: rechaza booleanos,
-decimales y cadenas. La semilla acepta un entero o `None`.
-Las entradas inválidas generan `ValueError`.
-
-| Llamada | Efecto |
+| Parte | Cambio pendiente |
 | --- | --- |
-| `tick()` | Suma una unidad al reloj y al proceso actual cuando está running. |
-| `interrupt()` | I: coloca el actual al final del lote y despacha el siguiente. |
-| `fail()` | E: termina el actual por error y despacha el siguiente. |
-| `pause()` | P: cambia a paused. Repetir P en paused no modifica nada. |
-| `resume()` | C: continúa desde paused. Repetir C en running no modifica nada. |
-| `snapshot()` | Devuelve una copia con datos simples y listas, serializable a JSON. |
+| Lotes pendientes | Mostrar cantidad de nuevos con `nuevos.length`. |
+| Lote actual | Mostrar `memoria_ocupada` de un máximo de 3. |
+| Tabla del lote | Sustituir filtros por lote por CPU/listos; respetar `en_espera` como FCFS. |
+| Bloqueados | Agregar ID y `bloqueo_transcurrido`/`bloqueo_restante` del servidor. No usar el acumulado como duración del bloqueo actual. |
+| CPU libre | Mostrar que espera bloqueados sin tratarlo como completed ni detener las consultas. |
+| Controles | I/E disponibles solo con running y CPU; P/C según estado. Actualizar textos y teclas I/E/P/C. |
+| Terminados y tabla final | Quitar lote; mostrar resultado o ERROR, llegada, finalización, retorno, respuesta, espera y servicio desde ejecutado. Conservar null como dato desconocido. |
+| Consulta y recuperación | Mantener ID en sessionStorage, serializar peticiones y recuperar el snapshot; tratar 404, 409, 422 y errores de red. |
 
-Los métodos de control y `tick()` devuelven `None`. Después de una acción,
-llama a `snapshot()` para obtener el estado de respuesta.
+No llevar un reloj ni recalcular tiempos en el navegador. Verificar el recorrido visual con nuevos, bloqueos, CPU libre, pausa, error, final normal y recarga. Registrar evidencia sin afirmar que ya funciona por existir el código.
 
-I/E en pausa o al finalizar generan `SimulationStateError`. P/C al finalizar
-también generan esa excepción; C no reinicia el motor. Los ticks en paused o
-completed no cambian el estado. Para reiniciar, crea otro motor.
+## Diferenciar fallos y cambios de contrato
 
-Las acciones no consumen tiempo. Un proceso terminado por E conserva lo que
-ejecutó, tiene `resultado=null` y `restante=0`. Debe mostrarse ERROR según su
-estado. Un proceso finished conserva el resultado numérico completo.
-La división es real y el residuo sigue las reglas de Python: `-8 % 3 = 1` y
-`8 % -3 = -1`. El redondeo de la división a un máximo de 4 decimales corresponde
-a la presentación; no cambia el resultado guardado.
+No son fallos del motor: campos de lotes ausentes, CPU null con bloqueados, resultado null por error, controles I/E rechazados sin CPU y espera que excluye nuevos y bloqueo. Son cambios documentados o estados válidos.
 
-## Adaptación a la API
+Si una prueba de integración detecta un fallo del motor, entregar la secuencia mínima de create/tick/acciones, snapshot real y esperado. Revisar la corrección con el responsable del motor antes de modificar otras áreas. No existe un fallo conocido que impida la entrega dentro de lo revisado.
 
-El snapshot usa los campos de la página 15 del manual:
-`estado`, `reloj`, `lote_actual`, `lotes_pendientes`, `total_trabajos`,
-`en_ejecucion`, `en_espera` y `terminados`. Cada proceso incluye ID, lote,
-estado, operación, operandos, TME, ejecutado, restante y resultado.
+## Verificación de referencia
 
-`en_espera` contiene solo el lote activo. Los lotes pendientes excluyen ese
-lote. Al terminar: `lote_actual=null`, `en_ejecucion=null`, `en_espera=[]` y
-`lotes_pendientes=0`. Los terminados se conservan en orden de terminación.
+En la revisión del motor: **79 pruebas del motor y 94 de la suite completa aprobadas**. Se comprobaron los cuatro ejemplos reales de snapshot, casos conocidos de tiempos, colas, memoria, bloqueos simultáneos/repetidos, controles y pausa. Comandos en [README](../README.md#pruebas).
 
-El servicio agrega el ID externo sin modificar el motor:
+La suite actual de API comprueba varios recorridos básicos, pero no sustituye todos los criterios anteriores. No se verificó el recorrido HTTP completo con reloj real ni la adaptación visual. La tarea automática sigue siendo parte de las verificaciones que debe cerrar el compañero de API.
 
-```python
-respuesta = {"simulacion_id": simulacion_id, **motor.snapshot()}
-```
-
-El integrante 2 debe implementar:
-
-1. Modelos de entrada estrictos y rutas create, GET y actions del manual.
-2. Almacenamiento de motores por ID, con un bloqueo por simulación.
-3. Un reloj del servidor que invoque `tick()` una vez por segundo real.
-4. El mismo bloqueo para tick, acciones y lectura del snapshot.
-5. Respuestas 422 para entradas inválidas, 404 para IDs ausentes y 409 para
-   `SimulationStateError`, usando su mensaje como `detail`.
-6. Pruebas de API con el reloj automático desactivable desde el servicio.
-
-Mapa de acciones: `interrupt → interrupt()`, `error → fail()`,
-`pause → pause()`, `continue → resume()`.
-
-GET únicamente consulta; no debe llamar a tick. El motor no es seguro para
-acceso concurrente por sí solo: la exclusión mutua pertenece al servicio.
-Usar un proceso servidor y conservar el estado en memoria, conforme al manual.
-No exponer un endpoint público de tick.
-
-## Verificación
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest tests/test_engine.py -q
-```
-
-Verificado con Python 3.12.7: **41 pruebas aprobadas**. Incluyen N=1,3,4,7,
-operaciones y generación válida, interrupciones con tiempo conservado,
-errores, pausa, cambio de lote, final estable y snapshots independientes.
-Las pruebas usan tiempo simulado; no requieren esperar segundos reales.
-
-El motor y las pruebas pueden integrarse en la rama del integrante 2 mediante
-el PR de `feature/i1-motor-lotes`, después de su revisión. No se ha realizado
-commit, push ni merge como parte de esta entrega local.
+Solo actividad 6. No agregar procesos durante ejecución, N, B, tabla BCP, bloqueo de 9 segundos, otro motor permanente ni un selector. No se propone cambiar tecnologías, añadir una base de datos o desplegar en este paso.

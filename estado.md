@@ -2,35 +2,35 @@
 
 Última actualización: 3 de noviembre de 2026.
 
-## Entrega del motor
+## Situación actual
 
-**Motor FCFS de la actividad 6 de Sistemas Operativos terminado para entregar a API en el alcance revisado.** Rama comprobada: `feature/fcfs`; árbol limpio al comenzar. No se encontraron fallos funcionales en los casos comprobados. Commit de la entrega autorizado por el usuario. El push a origin/feature/fcfs requiere verificación del destino por revisión automática. No se hizo despliegue.
+**Motor FCFS de la actividad 6 de Sistemas Operativos terminado y entregado. Siguiente responsable: API/integración.** Rama comprobada: `feature/fcfs`. La entrega hasta `383a46f` se subió y verificó en `origin/feature/fcfs`. Esta actualización posterior solo modifica Markdown y se guarda en un commit local autorizado por el usuario, sin push. No se desplegó.
 
-Quedaron comprobados procesos y operaciones, nuevos y listos FCFS, admisión continua, máximo tres residentes contando CPU y bloqueados, I de 10 segundos, E con servicio real, pausa completa, reloj con CPU libre y cierre solo al terminar todos. Llegada se registra al admitir a memoria; primera atención no se reinicia; finalización, retorno, respuesta y espera respetan `fcfs.md`. Servicio y bloqueo se cuentan por separado.
+| Área | Estado vigente |
+| --- | --- |
+| Motor | FCFS, tres residentes, nuevos/listos/bloqueados, I de 10 segundos, E, P/C, tiempos y snapshot completos. Sin fallos conocidos en los casos revisados. |
+| API y servicio | Rutas, validaciones, reloj y locks existentes; ya transmiten el snapshot del motor. Falta cerrar las pruebas de integración FCFS y sustituir fixtures de lotes. |
+| Frontend | Sigue esperando lotes. Pendiente de paneles FCFS, bloqueados, controles, tiempos y tabla final. |
+| Documentación | Guías Markdown actualizadas. Los JSON antiguos de contrato y fixture siguen siendo de lotes y están señalados como pendientes. |
 
-`snapshot()` devuelve colas, CPU, terminados, memoria y tiempos, sin campos de lotes. Se verificaron null para instantes desconocidos, JSON serializable, copias independientes y consultas sin avance. Los bloqueados incluyen duración actual y restante además del acumulado.
+## Por dónde empieza el siguiente dev
 
-## Qué se cambió en esta revisión
+1. Leer [AGENTS.md](AGENTS.md) y [docs/entrega-motor.md](docs/entrega-motor.md). La entrega enumera tareas por área y criterios concretos para cerrar API.
+2. Revisar [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md): métodos, tipos, campos y cuatro snapshots reales reproducibles. Usar [docs/contrato-api.md](docs/contrato-api.md) para la envoltura HTTP y errores existentes.
+3. Completar pruebas del servicio/HTTP con memoria, CPU libre, bloqueo exacto, pausa, errores, consultas sin avance, tiempos null, concurrencia y cierre. No duplicar reloj, tiempos ni planificación. No reconstruir las rutas actuales.
+4. Reemplazar o retirar de consumidores `docs/contrato-api.json` y `docs/fixtures/motor-inicial.json`: no usarlos como FCFS. Después coordinar frontend con el contrato validado.
 
-- `tests/test_fcfs_handoff.py`: 15 secuencias mixtas reproducibles que comprueban identidad y conservación de procesos, capacidad, estados, partición de tiempos, primera atención estable, pausas, controles rechazados y finalización.
-- `simulation/__init__.py`: descripción corregida de lotes a FCFS. No fue necesario cambiar la lógica ni el snapshot del motor.
-- `docs/cambios-backend-fcfs.md`: entrega con métodos, esquema, cuatro ejemplos reales verificados, resultados de pruebas, punto de entrada para API y distinción entre fallos de motor e incompatibilidades del contrato anterior.
-- Este archivo: estado vigente de la entrega.
+Reglas que debe conservar API: llegada al admitir a memoria; primera atención solo al primer despacho; finalización normal o por error; retorno/respuesta calculados; espera solo en listos; ejecutado como servicio real; bloqueo separado. CPU null con running es válido si quedan bloqueados. Se eliminaron los campos públicos de lotes. El `lote` interno temporal no impide integrar snapshot.
 
 ## Comprobaciones
 
-- Pruebas específicas de motor (`test_engine.py`, `test_models.py`, `test_times.py`, `test_snapshot_fcfs.py` y `test_fcfs_handoff.py`): **79 aprobadas**.
-- Suite completa `.\.venv\Scripts\python.exe -m pytest -q`: **94 aprobadas**, incluidas las pruebas existentes de API/servicio.
-- Los cuatro snapshots de la guía coinciden exactamente con las secuencias ejecutadas en el motor con seed 123. Las pruebas de casos conocidos y bloqueos simultáneos, escalonados y repetidos siguen pasando.
-- Persisten avisos de permisos de caché de pytest y de deprecación Starlette/HTTPX en la suite completa. No hubo fallos. La validación visual y el recorrido HTTP completo con reloj real no se realizaron en esta revisión.
+- Revisión de entrega anterior: **79 pruebas del motor y 94 de la suite completa aprobadas**, incluidos los cuatro ejemplos reales de la guía. Se verificaron memoria, FCFS, tiempos conocidos, bloqueo simultáneo/escalonado/repetido, pausa, rechazo de controles y snapshots independientes.
+- Esta actualización documental se contrastó con rutas, esquemas, servicio, pruebas existentes y dependencias de lotes de la pantalla. Se comprobaron 41 enlaces locales sin rutas rotas y los bloques de código de las guías.
+- Prueba de reproducción de los cuatro snapshots documentados: **1 aprobada**, con el aviso existente de permisos de caché de pytest. `git diff --check` sin errores; solo cambiaron ocho archivos Markdown. No se repitió la suite completa porque no se cambió código.
+- Pendiente de acreditar: recorrido HTTP completo con reloj real y validación visual FCFS. Las pruebas básicas existentes de API no cubren por sí solas todos los criterios de la entrega.
 
-## Por dónde empieza el compañero de API
+## Archivos documentales actualizados
 
-1. Leer [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md), especialmente los métodos, el esquema y los ejemplos. No tomar `docs/contrato-api.md` ni su JSON anterior como contrato FCFS.
-2. Revisar el recorrido ya conectado en rutas y servicio: este agrega `simulacion_id` y transmite snapshot. Actualizar documentación y consumidores que todavía dependan de campos de lotes; admitir estados new/blocked, tiempos null y CPU null con running.
-3. Verificar mapeo interrupt/error/pause/continue a interrupt/fail/pause/resume, conflictos I/E sin CPU y reloj que continúa con bloqueados pero se congela en pausa. No recalcular tiempos ni planificar en API.
-4. Después coordinar frontend y probar el recorrido completo. La pantalla todavía espera lotes; no se considera adaptada por pasar la suite.
+`AGENTS.md`, `README.md`, `fcfs.md`, `docs/entrega-motor.md`, `docs/contrato-api.md`, `docs/cambios-backend-fcfs.md` y este archivo. `Manual-instructions.md` conserva el contenido histórico de actividad 4 con un aviso inicial que remite a las instrucciones vigentes.
 
-No queda un fallo conocido del motor que impida esta entrega. La permanencia interna de `lote` en Process/generador es compatibilidad temporal sin uso en FCFS ni exposición pública. README y contrato anterior siguen pendientes de actualización por sus áreas.
-
-No se modificaron API, servicio ni frontend. No se cambió el plan de `fcfs.md` ni se implementó o preparó actividad 8.
+No se modificaron motor, API, servicio ni frontend en este paso. Solo actividad 6; prohibido implementar o preparar actividad 8. Al cerrar la integración, actualizar este estado con archivos, pruebas, resultados y pendientes reales.

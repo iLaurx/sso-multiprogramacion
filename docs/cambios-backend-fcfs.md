@@ -1,14 +1,16 @@
 # Cambios del backend a FCFS — Actividad 6
 
-Guía del motor implementado de **Sistemas Operativos**. Describe el código actual de `simulation/`, no una propuesta. Sustituye las reglas de lotes de `contrato-api.md` para integrar FCFS. No se modificaron API ni frontend en este paso.
+Guía del motor implementado de **Sistemas Operativos**. Describe el código actual de `simulation/`, no una propuesta. Es la referencia Python para integrar FCFS; `contrato-api.md` describe su envoltura HTTP. No se modificaron API ni frontend en este paso.
+
+La integración siguiente y sus criterios de aceptación están en [entrega-motor.md](entrega-motor.md). El [contrato HTTP](contrato-api.md) ya se actualizó por escrito al código existente; aún falta cerrar las verificaciones de integración indicadas allí. Esta guía conserva los ejemplos y el contrato Python del motor.
 
 ## Por dónde empezar en API
 
-1. Usar esta guía y sus cuatro snapshots como referencia del motor. `fcfs.md` describe el plan; `contrato-api.md` y su JSON corresponden a lotes y no son el esquema vigente.
+1. Usar esta guía y sus cuatro snapshots como referencia del motor. `fcfs.md` explica las reglas; `contrato-api.md` documenta las rutas actuales. Su JSON separado `contrato-api.json` todavía es de lotes y debe reemplazarse al integrar.
 2. Revisar el recorrido ya existente: rutas → servicio → `SimulationEngine`. Mantener `simulacion_id` en el servicio y el reloj bajo su control; GET solo consulta. El motor no necesita un segundo planificador ni un reloj adicional.
 3. Revisar los esquemas de respuesta o consumidores del equipo: quitar campos de lotes, admitir `new`/`blocked`, tiempos con null y `en_ejecucion: null` aun en running. No traducir null a cero. Las listas conservan el orden recibido.
 4. Comprobar las acciones con los nombres HTTP actuales: `interrupt` → `interrupt()`, `error` → `fail()`, `pause` → `pause()` y `continue` → `resume()`. Con todos bloqueados, I/E deben producir conflicto, sin cerrar la simulación ni impedir P/C.
-5. Actualizar el contrato y probar el reloj del servicio con CPU libre, pausa y desbloqueo; después coordinar la adaptación de la pantalla. No usar `Process` directamente para crear trabajos durante una simulación.
+5. Validar el contrato escrito y probar el reloj del servicio con CPU libre, pausa y desbloqueo siguiendo [la entrega](entrega-motor.md#criterios-para-cerrar-api); después coordinar la adaptación de la pantalla. No usar `Process` directamente para crear trabajos durante una simulación.
 
 ## Métodos disponibles
 
@@ -327,9 +329,9 @@ Resultado: **79 pruebas del motor aprobadas**. La suite completa con `-m pytest 
 
 Implementado y probado en el motor: FCFS, admisión continua, tres residentes contando bloqueados, I durante 10 segundos, E con servicio real, P/C completos, reloj con CPU libre, cierre correcto, tiempos y snapshots independientes serializables.
 
-El servicio actual de `backend/service.py` ya utiliza el motor y transmite su snapshot sin transformarlo, agregando `simulacion_id`. Por eso las respuestas HTTP reciben estos cambios aunque no se hayan editado API ni rutas. Sus acciones actuales son interrupt, error, pause y continue; no existe endpoint público de tick. La frase de `contrato-api.md` que afirma que solo health está implementado está desactualizada frente al código actual.
+El servicio actual de `backend/service.py` ya utiliza el motor y transmite su snapshot sin transformarlo, agregando `simulacion_id`. Por eso las respuestas HTTP reciben estos cambios aunque no se hayan editado API ni rutas. Sus acciones actuales son interrupt, error, pause y continue; no existe endpoint público de tick. `contrato-api.md` ya describe esas rutas existentes; no hay que volver a crearlas.
 
-Pendiente: revisar formalmente la integración y su documentación de API con este esquema, adaptar la pantalla de lotes y probar el recorrido visual. La pantalla actual espera lote_actual, lotes_pendientes y lote; esos campos ya no se devuelven. No debe calcular tiempos localmente. La aprobación de las pruebas del motor/API no acredita esa adaptación visual. README y los ejemplos antiguos de contrato-api siguen pendientes de actualización en su etapa correspondiente.
+Pendiente: verificar la integración de API con este esquema, ampliar sus pruebas, sustituir los fixtures JSON antiguos, adaptar la pantalla de lotes y probar el recorrido visual. La pantalla actual espera lote_actual, lotes_pendientes y lote; esos campos ya no se devuelven. No debe calcular tiempos localmente. La aprobación de las pruebas del motor/API no acredita esa adaptación visual. README ya señala esta situación; las tareas por área están en entrega-motor.md.
 
 | Situación | Diagnóstico para API |
 | --- | --- |
@@ -341,4 +343,4 @@ Pendiente: revisar formalmente la integración y su documentación de API con es
 | Bloqueos simultáneos o coincidentes con finalización | Orden definido en esta guía, probado en el motor; no reordenar desde API. |
 | lote permanece dentro de Process/generador | Compatibilidad interna temporal sin efecto funcional ni exposición pública. No es trabajo pendiente para consumir snapshot. |
 
-No hay un fallo conocido del motor que bloquee la entrega en el alcance revisado. Quedan la revisión de integración HTTP, su documentación y la validación visual; no se declaran completadas por estas pruebas. No se modificaron API, servicio ni frontend. No se agregaron funciones de actividad 8. Commit de la entrega autorizado por el usuario; no se hizo despliegue.
+No hay un fallo conocido del motor que bloquee la entrega en el alcance revisado. Quedan la integración HTTP comprobada y la validación visual; no se declaran completadas por actualizar documentación. No se modificaron API, servicio ni frontend. No se agregaron funciones de actividad 8. La entrega del motor hasta `383a46f` se publicó en origin/feature/fcfs; esta actualización de Markdown es posterior y no se ha publicado. No se hizo despliegue.
