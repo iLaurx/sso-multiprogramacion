@@ -37,7 +37,10 @@ def test_fcfs_data_distinguishes_time_zero_and_preserves_snapshot_contract():
     assert process.inicio_bloqueo == 2
     assert (process.espera, process.bloqueado) == (3, 10)
     assert process.snapshot() == {
-        "id": 1, "lote": 1, "estado": "ready", "operacion": "+",
+        "id": 1, "estado": "ready", "operacion": "+",
         "operando_a": 8, "operando_b": 3, "tme": 7,
         "ejecutado": 2, "restante": 5, "resultado": None,
+        "llegada": 0, "primera_atencion": 0, "finalizacion": None,
+        "retorno": None, "respuesta": 0, "espera": 3,
+        "bloqueado": 10, "inicio_bloqueo": 2,
     }

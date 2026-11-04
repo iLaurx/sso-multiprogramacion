@@ -4,34 +4,25 @@
 
 ## Dónde estamos
 
-Actividad 6 de **Sistemas Operativos**, rama comprobada `feature/fcfs`. El motor usa nuevos y listos con admisión continua, máximo tres residentes y bloqueo real de 10 segundos simulados. Se conservaron los cambios locales de la etapa anterior. Commit local autorizado por el usuario para los cambios de FCFS y bloqueo. No se hizo push ni despliegue.
+Actividad 6 de **Sistemas Operativos**, rama comprobada `feature/fcfs`. Motor FCFS con tres residentes, bloqueo de 10 segundos, tiempos y salida pública preparados para revisar la integración. Se conservaron los cambios locales de tiempos de la etapa anterior. Commit local autorizado por el usuario para todos los cambios pendientes de tiempos, snapshot y guía FCFS. No se hizo push ni despliegue.
 
 ## Qué quedó hecho
 
-- `simulation/engine.py`: `interrupt()` mueve el proceso activo a bloqueados, registra `inicio_bloqueo` y despacha al siguiente listo sin avanzar el reloj. El bloqueado conserva `ejecutado`, llegada y su espacio en memoria.
-- Cada tick suma servicio al proceso que ya estaba en CPU y un segundo de `bloqueado` a cada proceso en E/S. Al cumplirse 10 segundos desde `inicio_bloqueo`, vuelve al final de listos y limpia ese instante con `None`. El acumulado se conserva entre bloqueos repetidos.
-- El reloj y los bloqueos avanzan también sin CPU activa. Los recién desbloqueados pueden ser despachados al cerrar el tick, pero empiezan a consumir servicio en el siguiente. Pausa congela reloj, CPU y bloqueos. La simulación no termina mientras queden bloqueados.
-- Orden en un mismo instante: los desbloqueados se agregan detrás de los listos existentes, en orden de bloqueo; si también termina la CPU, el nuevo admitido se agrega después de esos desbloqueados. No se desaloja a la CPU activa.
-- `simulation/models.py`: comentario actualizado para indicar que ya se acumula tiempo bloqueado; no cambió su estructura ni `Process.snapshot()`.
-- `tests/test_engine.py`: adaptadas las pruebas de interrupción y las invariantes para incluir CPU ociosa; pruebas de duración exacta, retorno FCFS, memoria, CPU libre, pausa cerca del vencimiento, bloqueos repetidos, simultáneos y escalonados, y coincidencia de desbloqueo con finalización.
-- `tests/test_api.py`: se ajustaron las expectativas de la prueba de acciones al nuevo comportamiento del motor; no se editaron archivos de API.
+- `simulation/models.py`: `Process.snapshot()` expone llegada, primera atención, finalización, retorno, respuesta, espera, bloqueo acumulado e inicio del bloqueo actual. Conserva identidad, operación, operandos, TME, ejecutado como servicio real, restante, resultado y estado. Elimina `lote` de la salida; permanece internamente por compatibilidad con el constructor y generador, sin uso en la planificación.
+- `simulation/engine.py`: snapshot con nuevos, listos mediante `en_espera`, CPU, bloqueados, terminados y memoria ocupada. No devuelve campos de lotes. Las entradas de bloqueados agregan `bloqueo_transcurrido` y `bloqueo_restante` del bloqueo actual, calculados desde el reloj sin modificar el motor. `bloqueado` sigue siendo el acumulado entre bloqueos.
+- Se conservan los tiempos ya implementados: llegada al admitir, primera atención solo al primer despacho, finalización normal o por error, espera solo en listos, servicio real y bloqueo separado. Retorno/respuesta se calculan sin contadores duplicados; instantes desconocidos se devuelven como null.
+- `docs/cambios-backend-fcfs.md`: guía de métodos, campos conservados/agregados/eliminados, reglas de reloj, errores, cuatro ejemplos completos generados por el motor y pendientes de integración.
+- `tests/test_models.py` y `tests/test_times.py`: contrato adaptado a los tiempos públicos y eliminación de lote. `tests/test_snapshot_fcfs.py`: bloqueos repetidos, pausa, copias independientes, tiempos finales conocidos y reproducción exacta de los JSON de la guía. Se mantienen las pruebas de tiempos de la etapa anterior.
 
 ## Comprobaciones
 
-- Se revisaron AGENTS.md, fcfs.md, estado anterior, README, modelo, motor y pruebas correspondientes.
-- `.\.venv\Scripts\python.exe -m pytest -q`: **68 pruebas aprobadas**, incluidas API y servicio. Persisten avisos de deprecación Starlette/HTTPX y permisos de caché de pytest; no hubo fallos.
-- Se comprobó que bloquear tres residentes no admite un cuarto nuevo, que el desbloqueo no consume servicio en ese mismo tick y que la pausa conserva también los datos internos del bloqueo.
+- Se revisaron AGENTS.md, fcfs.md, estado previo, README, motor, modelo, generador, servicio y contrato anterior.
+- `.\.venv\Scripts\python.exe -m pytest -q`: **79 pruebas aprobadas**, incluidas API y servicio. Avisos de deprecación Starlette/HTTPX y permisos de caché de pytest; sin fallos.
+- Se comprobaron JSON serializable, ausencia de campos de lotes, copias que no alteran el motor, consultas sin avance, pausa de datos internos y públicos, bloqueo actual separado del acumulado y tiempos de casos conocidos. Los cuatro ejemplos documentados coinciden con el motor usando seed 123.
 
-## Datos y coordinación con API/frontend
+## Coordinación y siguiente paso
 
-- No se modificaron `backend/` ni `frontend/`. Se conservan métodos y claves del snapshot de la etapa anterior: `estado`, `reloj`, `nuevos`, `bloqueados`, `memoria_ocupada`, `total_trabajos`, `en_ejecucion`, `en_espera` y `terminados`.
-- La API transmite directamente ese snapshot: `interrupt` ahora devuelve el proceso en `bloqueados` con estado `blocked`. Si todos están bloqueados, `en_ejecucion` es `None` y el estado sigue `running`; I/E sin CPU activa se rechazan, P/C siguen disponibles.
-- `Process.snapshot()` todavía no expone llegada, inicio de bloqueo ni tiempos acumulados. `lote` permanece como metadato temporal y no participa en la planificación.
-- La pantalla todavía espera los campos de lotes retirados en la etapa anterior y no representa correctamente FCFS ni bloqueados. Las pruebas aprobadas no son una validación visual.
-
-## Qué sigue pendiente
-
-- Registrar primera atención, finalización y espera; llegada, servicio y tiempo bloqueado ya se actualizan. Definir la exposición de tiempos de retorno y respuesta con las reglas de `fcfs.md`.
-- Completar las pruebas de tiempos, preparar la guía real del backend y después adaptar API y pantalla. README y `docs/contrato-api.md` siguen describiendo lotes; `fcfs.md` es el plan, no el contrato final.
-
-Solo actividad 6. No se implementó ni preparó actividad 8. Revisar rama y cambios locales antes de continuar.
+- No se editaron `backend/` ni `frontend/`. El servicio existente ya llama al motor, agrega `simulacion_id` y transmite el snapshot: sus respuestas reflejan automáticamente este esquema. `contrato-api.md` está desactualizado, incluso al afirmar que solo health está implementado.
+- Revisar la integración y documentación de API con [la guía nueva](docs/cambios-backend-fcfs.md); después adaptar la pantalla y comprobar el recorrido visual. La pantalla sigue esperando lote, lote_actual y lotes_pendientes; todavía no representa correctamente FCFS. README y ejemplos anteriores también requieren actualización en su etapa.
+- No queda una función del motor solicitada en este paso pendiente. La integración formal y validación visual no se dan por terminadas con las pruebas automatizadas.
+- Se mantiene el plan de `fcfs.md`; solo actividad 6, sin implementar ni preparar actividad 8.

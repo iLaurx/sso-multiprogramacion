@@ -59,6 +59,8 @@ class SimulationEngine:
         if self._current is None and self._queue:
             self._current = self._queue.popleft()
             self._current.estado = "running"
+            if self._current.primera_atencion is None:
+                self._current.primera_atencion = self.clock
         if self._current is None and not self._new and not self._queue and not self._blocked:
             self.status = "completed"
 
@@ -78,15 +80,20 @@ class SimulationEngine:
         """Avanza un segundo simulado; pausa y final son operaciones sin cambios."""
         if self.status != "running":
             return
-        # El intervalo lo consume únicamente quien ya estaba en CPU o bloqueados.
+        # El intervalo se cuenta según el estado de cada residente al comenzar.
         # Un proceso desbloqueado se despacha al final y ejecuta desde el próximo tick.
         process = self._current
+        # Solo cuentan quienes estaban listos durante este intervalo.
+        # Nuevos y desbloqueados al final del tick empiezan a esperar después.
+        for ready in self._queue:
+            ready.espera += 1
         self.clock += 1
         if process is not None:
             process.ejecutado += 1
             if process.ejecutado == process.tme:
                 process.resultado = calculate(process.operacion, process.operando_a, process.operando_b)
                 process.estado = "finished"
+                process.finalizacion = self.clock
                 self._finished.append(process)
                 self._current = None
         for blocked in self._blocked[:]:
@@ -116,6 +123,7 @@ class SimulationEngine:
     def fail(self) -> None:
         process = self._require_running()
         process.estado = "error"
+        process.finalizacion = self.clock
         process.resultado = None
         self._finished.append(process)
         self._current = None
@@ -145,7 +153,14 @@ class SimulationEngine:
             "estado": self.status,
             "reloj": self.clock,
             "nuevos": [process.snapshot() for process in self._new],
-            "bloqueados": [process.snapshot() for process in self._blocked],
+            "bloqueados": [
+                {
+                    **process.snapshot(),
+                    "bloqueo_transcurrido": self.clock - process.inicio_bloqueo,
+                    "bloqueo_restante": 10 - (self.clock - process.inicio_bloqueo),
+                }
+                for process in self._blocked
+            ],
             "memoria_ocupada": self.memoria_ocupada,
             "total_trabajos": self.total_trabajos,
             "en_ejecucion": self._current.snapshot() if self._current else None,

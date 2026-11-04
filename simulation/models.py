@@ -51,10 +51,23 @@ class Process:
 
     # Duraciones en segundos simulados. Espera solo cuenta el tiempo en listos;
     # bloqueado acumula el tiempo de E/S y ejecutado sigue siendo el servicio.
-    # El motor actualiza bloqueado en cada tick de E/S; espera sigue pendiente.
-    # Estos acumuladores aún no se exponen en snapshot().
+    # El motor acumula espera en listos y bloqueado durante E/S en cada tick.
     espera: int = 0
     bloqueado: int = 0
+
+    @property
+    def retorno(self) -> int | None:
+        """Duración desde la admisión a memoria hasta la finalización."""
+        if self.llegada is None or self.finalizacion is None:
+            return None
+        return self.finalizacion - self.llegada
+
+    @property
+    def respuesta(self) -> int | None:
+        """Demora hasta el primer despacho; cero es una respuesta válida."""
+        if self.llegada is None or self.primera_atencion is None:
+            return None
+        return self.primera_atencion - self.llegada
 
     # * Calcula el tiempo pendiente cada vez que se consulta, sin almacenarlo aparte.
     # ? @property permite leer proceso.restante sin escribir paréntesis.
@@ -70,7 +83,6 @@ class Process:
     def snapshot(self) -> dict:
         return {
             "id": self.id,
-            "lote": self.lote,
             "estado": self.estado,
             "operacion": self.operacion,
             "operando_a": self.operando_a,
@@ -79,4 +91,12 @@ class Process:
             "ejecutado": self.ejecutado,
             "restante": self.restante,
             "resultado": self.resultado,
+            "llegada": self.llegada,
+            "primera_atencion": self.primera_atencion,
+            "finalizacion": self.finalizacion,
+            "retorno": self.retorno,
+            "respuesta": self.respuesta,
+            "espera": self.espera,
+            "bloqueado": self.bloqueado,
+            "inicio_bloqueo": self.inicio_bloqueo,
         }
