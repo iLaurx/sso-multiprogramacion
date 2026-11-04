@@ -6,7 +6,7 @@ from typing import Literal
 # ? Literal describe los valores permitidos para el análisis de tipos;
 # ? no valida por sí mismo los datos al ejecutar el programa.
 Operation = Literal["+", "-", "*", "/", "%"]
-ProcessStatus = Literal["ready", "running", "finished", "error"]
+ProcessStatus = Literal["new", "ready", "running", "blocked", "finished", "error"]
 SimulationStatus = Literal["running", "paused", "completed"]
 
 
@@ -41,6 +41,19 @@ class Process:
     ejecutado: int = 0
     estado: ProcessStatus = "ready"
     resultado: int | float | None = None
+
+    # Instantes del reloj simulado; None indica que el evento aún no ocurrió.
+    # Llegada corresponde a la admisión a memoria, no a la generación.
+    llegada: int | None = None
+    primera_atencion: int | None = None
+    finalizacion: int | None = None
+    inicio_bloqueo: int | None = None
+
+    # Duraciones en segundos simulados. Espera solo cuenta el tiempo en listos;
+    # bloqueado acumula el tiempo de E/S y ejecutado sigue siendo el servicio.
+    # El motor de lotes aún no actualiza estos datos ni los expone en snapshot().
+    espera: int = 0
+    bloqueado: int = 0
 
     # * Calcula el tiempo pendiente cada vez que se consulta, sin almacenarlo aparte.
     # ? @property permite leer proceso.restante sin escribir paréntesis.
