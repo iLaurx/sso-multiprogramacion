@@ -51,7 +51,8 @@ class Process:
 
     # Duraciones en segundos simulados. Espera solo cuenta el tiempo en listos;
     # bloqueado acumula el tiempo de E/S y ejecutado sigue siendo el servicio.
-    # El motor de lotes aún no actualiza estos datos ni los expone en snapshot().
+    # El motor actualiza bloqueado en cada tick de E/S; espera sigue pendiente.
+    # Estos acumuladores aún no se exponen en snapshot().
     espera: int = 0
     bloqueado: int = 0
 
