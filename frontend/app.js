@@ -37,7 +37,6 @@ const elementos = {
 let simulacionId = sessionStorage.getItem("simulacion_id");
 let snapshotActual = null;
 let ocupado = false;
-let colaPeticiones = Promise.resolve();
 let temporizador = null;
 let historialLog = [];
 let estadosAnteriores = new Map();
@@ -110,6 +109,7 @@ async function solicitar(ruta, opciones = {}) {
 async function comprobarApi() {
   try {
     const respuesta = await fetch(ENDPOINT_HEALTH);
+    if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
     const datos = await respuesta.json();
 
     if (elementos.estadoApi) {
@@ -157,7 +157,9 @@ function textoEstado(proceso, estadoLista) {
 
 function dibujarColumna(contenedor, procesos, estado, vacio) {
   if (!contenedor) return;
-  contenedor.replaceChildren();
+  const tarjetaCpu = estado === "running" && procesos.length === 1
+    ? contenedor.querySelector(`[data-cpu-id="${procesos[0].id}"]`) : null;
+  if (!tarjetaCpu) contenedor.replaceChildren();
   if (!procesos.length) {
     const mensaje = document.createElement("div");
     mensaje.className = "state-empty";
@@ -166,7 +168,7 @@ function dibujarColumna(contenedor, procesos, estado, vacio) {
     return;
   }
   procesos.forEach(proceso => {
-    const tarjeta = document.createElement("article");
+    const tarjeta = tarjetaCpu || document.createElement("article");
     const esError = proceso.estado === "error";
     tarjeta.className = `state-process ${estado === "blocked" ? "blocked" : ""} ${estado === "finished" ? "finished" : ""} ${esError ? "error" : ""}`.trim();
     const restanteBloqueo = proceso.bloqueo_restante;
@@ -177,8 +179,35 @@ function dibujarColumna(contenedor, procesos, estado, vacio) {
         : estado === "running"
           ? `TME ${mostrarValor(proceso.tme)} · servicio ${mostrarValor(proceso.ejecutado)} · restante ${mostrarValor(proceso.restante)}`
           : `TME ${mostrarValor(proceso.tme)} · restante ${mostrarValor(proceso.restante)}`;
-    tarjeta.textContent = `P${proceso.id} · ${formatearOperacion(proceso)} · ${detalle}`;
-    contenedor.appendChild(tarjeta);
+    if (estado === "running") {
+      tarjeta.dataset.cpuId = proceso.id;
+      if (!tarjetaCpu) {
+        const texto = document.createElement("div");
+        texto.className = "cpu-texto";
+        const etiqueta = document.createElement("div");
+        etiqueta.className = "cpu-progreso-texto";
+        const barra = document.createElement("div");
+        barra.className = "cpu-progreso";
+        barra.setAttribute("role", "progressbar");
+        barra.setAttribute("aria-label", `Tiempo ejecutado del proceso ${proceso.id}`);
+        barra.setAttribute("aria-valuemin", "0");
+        const relleno = document.createElement("div");
+        relleno.className = "cpu-progreso-relleno";
+        barra.appendChild(relleno);
+        tarjeta.append(texto, etiqueta, barra);
+      }
+      tarjeta.querySelector(".cpu-texto").textContent = `P${proceso.id} · ${formatearOperacion(proceso)} · ${detalle}`;
+      tarjeta.querySelector(".cpu-progreso-texto").textContent = `Faltan ${mostrarValor(proceso.restante)} · ${mostrarValor(proceso.ejecutado)} de ${mostrarValor(proceso.tme)}`;
+      const barra = tarjeta.querySelector(".cpu-progreso");
+      barra.setAttribute("aria-valuemax", proceso.tme);
+      barra.setAttribute("aria-valuenow", proceso.ejecutado);
+      barra.setAttribute("aria-valuetext", `${proceso.ejecutado} de ${proceso.tme} segundos ejecutados; faltan ${proceso.restante} segundos`);
+      const porcentaje = proceso.tme > 0 ? Math.min(100, Math.max(0, proceso.ejecutado / proceso.tme * 100)) : 0;
+      barra.firstElementChild.style.width = `${porcentaje}%`;
+    } else {
+      tarjeta.textContent = `P${proceso.id} · ${formatearOperacion(proceso)} · ${detalle}`;
+    }
+    if (!tarjetaCpu) contenedor.appendChild(tarjeta);
   });
 }
 
@@ -199,9 +228,6 @@ function renderizarDiagrama(snapshot, listas) {
       : idle;
   }
 
-  if (typeof window.dibujarProcesos === "function") {
-    window.dibujarProcesos(listas);
-  }
 }
 
 function todosLosProcesos(listas) {
@@ -296,10 +322,6 @@ function renderizar(snapshot) {
   const isPaused = snapshot.estado === "paused";
   const isCompleted = snapshot.estado === "completed";
   const hayCpu = Boolean(snapshot.en_ejecucion);
-  elementos.btnInterrupt.disabled = !isRunning || !hayCpu;
-  elementos.btnError.disabled = !isRunning || !hayCpu;
-  elementos.btnPause.disabled = !isRunning;
-  elementos.btnContinue.disabled = !isPaused;
 
   if (elementos.estadoControles) {
     if (isCompleted) elementos.estadoControles.textContent = "Simulación finalizada. El resumen queda disponible.";
@@ -308,7 +330,7 @@ function renderizar(snapshot) {
     else if (isRunning) elementos.estadoControles.textContent = "Usa I para bloqueo por E/S, E para error, P para pausar y C para continuar.";
     else elementos.estadoControles.textContent = "Inicia una simulación para habilitar los controles.";
   }
-  actualizarBotonesInicio();
+  actualizarControles();
 }
 
 // ==========================================
@@ -348,35 +370,42 @@ function programarConsulta() {
       renderizar(datos);
     }).catch(error => {
       mostrarMensaje(`No se pudo actualizar: ${mostrarError(error)}`);
-    }).finally(() => {
-      programarConsulta();
     });
   }, 1000);
 }
 
-function actualizarBotonesInicio() {
-  const deshabilitado = ocupado || snapshotActual?.estado === "running" || snapshotActual?.estado === "paused";
+function actualizarControles() {
+  // Un ID pendiente de recuperación también impide crear otra simulación.
+  const deshabilitado = ocupado || Boolean(simulacionId && snapshotActual?.estado !== "completed");
   elementos.btnIniciar.disabled = deshabilitado;
   elementos.btnIniciarEmulacion.disabled = deshabilitado;
+  const running = snapshotActual?.estado === "running";
+  const paused = snapshotActual?.estado === "paused";
+  elementos.btnInterrupt.disabled = ocupado || !running || !snapshotActual?.en_ejecucion;
+  elementos.btnError.disabled = elementos.btnInterrupt.disabled;
+  elementos.btnPause.disabled = ocupado || !running;
+  elementos.btnContinue.disabled = ocupado || !paused;
 }
 
 function ejecutarExclusivo(trabajo) {
-  const tarea = colaPeticiones.then(async () => {
-    ocupado = true;
-    actualizarBotonesInicio();
-
+  // Reservar antes del primer await: no acumular clics/teclas sobre un estado viejo.
+  if (ocupado) return Promise.resolve();
+  ocupado = true;
+  detenerConsultas();
+  actualizarControles();
+  return (async () => {
     try {
       await trabajo();
     } finally {
       ocupado = false;
-      actualizarBotonesInicio();
+      actualizarControles();
+      programarConsulta();
     }
-  });
-  colaPeticiones = tarea.catch(() => {});
-  return tarea;
+  })();
 }
 
 async function iniciarSimulacion() {
+  if (ocupado || (simulacionId && snapshotActual?.estado !== "completed")) return;
   const cantidad = Number(elementos.numeroTrabajos.value);
 
   if (
@@ -409,11 +438,10 @@ async function iniciarSimulacion() {
     renderizar(datos);
     mostrarMensaje("Simulación creada correctamente.");
   });
-
-  programarConsulta();
 }
 
 async function ejecutarAccion(accion) {
+  if (ocupado) return;
   if (!simulacionId || !snapshotActual) {
     mostrarMensaje("Primero inicia una simulación.");
     return;
@@ -461,8 +489,6 @@ async function ejecutarAccion(accion) {
     if (descripcionesAccion[accion]) registrarEvento(descripcionesAccion[accion]);
     mostrarMensaje(descripcionesAccion[accion] || `Acción: ${accion}`);
   });
-
-  programarConsulta();
 }
 
 // ==========================================
@@ -488,7 +514,8 @@ document.addEventListener("keydown", event => {
   }
 
   // Si se está escribiendo en un input, ignorar teclas de control
-  if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName) ||
+      document.activeElement?.isContentEditable || event.isComposing) {
     return;
   }
 
@@ -552,11 +579,9 @@ async function recuperarSimulacion() {
     renderizar(datos);
     registrarEvento("Simulación anterior recuperada.");
     mostrarMensaje("Se recuperó la simulación anterior.");
-    programarConsulta();
   } catch (error) {
     mostrarMensaje(`No se pudo recuperar la simulación: ${mostrarError(error)}`);
     // Conservar el ID ante fallos de red; 404 ya limpia el estado en solicitar.
-    programarConsulta();
   }
 }
 
@@ -572,4 +597,6 @@ async function iniciarFrontend() {
   }
 }
 
-iniciarFrontend();
+ejecutarExclusivo(iniciarFrontend).catch(error => {
+  mostrarMensaje(`No se pudo iniciar la pantalla: ${mostrarError(error)}`);
+});
