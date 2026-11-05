@@ -32,7 +32,7 @@ Estos límites ayudan a coordinarse. No cambies archivos de otra área por inici
 
 El motor FCFS ya está terminado y revisado. Su contrato Python y los ejemplos reales están en [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md). El siguiente trabajo corresponde a integración de API/servicio y después frontend, según [docs/entrega-motor.md](docs/entrega-motor.md). Las rutas y el servicio ya existen: revisarlos y completar las pruebas necesarias, sin reconstruirlos ni duplicar el motor.
 
-[docs/contrato-api.md](docs/contrato-api.md) documenta las rutas actuales y cómo reciben el snapshot FCFS; su validación de integración pendiente se indica allí. `docs/contrato-api.json` y `docs/fixtures/motor-inicial.json` son ejemplos históricos de lotes: no usarlos como contrato o fixture FCFS. Su reemplazo corresponde al paso de API. `Manual-instructions.md` conserva el manual histórico de actividad 4; no rige actividad 6.
+[docs/contrato-api.md](docs/contrato-api.md) documenta las rutas y la respuesta FCFS validada. `docs/contrato-api.json` y `docs/fixtures/motor-inicial.json` son ejemplos FCFS reproducibles comprobados en las pruebas de API. `Manual-instructions.md` conserva el manual histórico de actividad 4; no rige actividad 6.
 
 Al trabajar en API, preservar los tiempos que calcula el motor, el orden de las listas y los null. Una CPU libre no significa simulación terminada: puede haber bloqueados. No modificar `simulation/` salvo un fallo concreto reproducido y necesario para el paso solicitado.
 

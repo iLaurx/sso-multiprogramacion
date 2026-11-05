@@ -1,36 +1,33 @@
 # Estado del proyecto
 
-Última actualización: 3 de noviembre de 2026.
+Última actualización: 4 de noviembre de 2026.
 
 ## Situación actual
 
-**Motor FCFS de la actividad 6 de Sistemas Operativos terminado y entregado. Siguiente responsable: API/integración.** Rama comprobada: `feature/fcfs`. La entrega hasta `383a46f` se subió y verificó en `origin/feature/fcfs`. Esta actualización posterior solo modifica Markdown y se guarda en un commit local autorizado por el usuario, sin push. No se desplegó.
+**Motor y API/servicio FCFS de actividad 6 comprobados en las pruebas descritas abajo. Sigue frontend.** Rama comprobada: `feature/fcfs`. Esta revisión comenzó con cambios locales de la integración anterior y los conservó. Sin commit, push ni despliegue.
 
-| Área | Estado vigente |
-| --- | --- |
-| Motor | FCFS, tres residentes, nuevos/listos/bloqueados, I de 10 segundos, E, P/C, tiempos y snapshot completos. Sin fallos conocidos en los casos revisados. |
-| API y servicio | Rutas, validaciones, reloj y locks existentes; ya transmiten el snapshot del motor. Falta cerrar las pruebas de integración FCFS y sustituir fixtures de lotes. |
-| Frontend | Sigue esperando lotes. Pendiente de paneles FCFS, bloqueados, controles, tiempos y tabla final. |
-| Documentación | Guías Markdown actualizadas. Los JSON antiguos de contrato y fixture siguen siendo de lotes y están señalados como pendientes. |
-
-## Por dónde empieza el siguiente dev
-
-1. Leer [AGENTS.md](AGENTS.md) y [docs/entrega-motor.md](docs/entrega-motor.md). La entrega enumera tareas por área y criterios concretos para cerrar API.
-2. Revisar [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md): métodos, tipos, campos y cuatro snapshots reales reproducibles. Usar [docs/contrato-api.md](docs/contrato-api.md) para la envoltura HTTP y errores existentes.
-3. Completar pruebas del servicio/HTTP con memoria, CPU libre, bloqueo exacto, pausa, errores, consultas sin avance, tiempos null, concurrencia y cierre. No duplicar reloj, tiempos ni planificación. No reconstruir las rutas actuales.
-4. Reemplazar o retirar de consumidores `docs/contrato-api.json` y `docs/fixtures/motor-inicial.json`: no usarlos como FCFS. Después coordinar frontend con el contrato validado.
-
-Reglas que debe conservar API: llegada al admitir a memoria; primera atención solo al primer despacho; finalización normal o por error; retorno/respuesta calculados; espera solo en listos; ejecutado como servicio real; bloqueo separado. CPU null con running es válido si quedan bloqueados. Se eliminaron los campos públicos de lotes. El `lote` interno temporal no impide integrar snapshot.
+- Motor: no se modificó `simulation/`; no se encontró un fallo que requiriera corregirlo.
+- API: conserva las rutas, validaciones y acciones existentes. Devuelve el snapshot completo agregando únicamente `simulacion_id`, con orden y null intactos. GET no llama tick.
+- Servicio (`backend/service.py`): conserva reloj y lock por simulación. Termina la tarea automática al completar el último tick y rechaza acciones desconocidas en llamadas internas con ValueError (HTTP sigue devolviendo 422 por validación).
+- Ejemplos: `docs/contrato-api.json` y `docs/fixtures/motor-inicial.json` reemplazados por salidas reales FCFS con cuatro procesos y seed 123. UUID HTTP generado realmente y variable; reproducción comprobada excluyendo solo ese ID.
+- Documentación actualizada: `docs/contrato-api.md`, `docs/entrega-motor.md`, `docs/cambios-backend-fcfs.md`, `README.md`, `AGENTS.md` y este estado. Las revisiones anteriores de la guía del motor son evidencia histórica; este archivo contiene la situación vigente.
 
 ## Comprobaciones
 
-- Revisión de entrega anterior: **79 pruebas del motor y 94 de la suite completa aprobadas**, incluidos los cuatro ejemplos reales de la guía. Se verificaron memoria, FCFS, tiempos conocidos, bloqueo simultáneo/escalonado/repetido, pausa, rechazo de controles y snapshots independientes.
-- Esta actualización documental se contrastó con rutas, esquemas, servicio, pruebas existentes y dependencias de lotes de la pantalla. Se comprobaron 41 enlaces locales sin rutas rotas y los bloques de código de las guías.
-- Prueba de reproducción de los cuatro snapshots documentados: **1 aprobada**, con el aviso existente de permisos de caché de pytest. `git diff --check` sin errores; solo cambiaron ocho archivos Markdown. No se repitió la suite completa porque no se cambió código.
-- Pendiente de acreditar: recorrido HTTP completo con reloj real y validación visual FCFS. Las pruebas básicas existentes de API no cubren por sí solas todos los criterios de la entrega.
+En esta revisión solo se editaron documentos. Se contrastaron rutas, esquemas, servicio y pruebas. Se añadió [la guía de frontend](docs/guia-frontend-fcfs.md), con rutas, controles, campos, tiempos, errores y cuatro respuestas HTTP completas capturadas con TestClient y comparadas contra el motor real. Se actualizaron contrato y entrega para distinguir lo comprobado de los pendientes visuales.
 
-## Archivos documentales actualizados
+`tests/test_api_fcfs.py` agrega recorridos HTTP completos contrastados contra el motor, tiempos conocidos, memoria/admisión normal y por error, orden de colas, null/cero, tres bloqueados, CPU libre, límite exacto de 10 segundos, pausa con CPU y con todos bloqueados, controles rechazados sin cambios, consultas repetidas, finalización, aislamiento/concurrencia y copias independientes. También comprueba la tarea automática con pulsos controlados de su espera y reproducción de ambos JSON.
 
-`AGENTS.md`, `README.md`, `fcfs.md`, `docs/entrega-motor.md`, `docs/contrato-api.md`, `docs/cambios-backend-fcfs.md` y este archivo. `Manual-instructions.md` conserva el contenido histórico de actividad 4 con un aviso inicial que remite a las instrucciones vigentes.
+- API/servicio: 23 pruebas aprobadas al repetir `.\.venv\Scripts\python.exe -m pytest -q tests/test_api.py tests/test_service.py tests/test_api_fcfs.py`.
+- Suite completa: **105 aprobadas** con `.\.venv\Scripts\python.exe -m pytest -q`.
+- `git diff --check`: sin errores.
+- Avisos existentes: deprecación Starlette/HTTPX y permisos de caché pytest; no fallos de pruebas.
+- No se verificó el recorrido de navegador con reloj real ni la interfaz FCFS. No se modificó frontend.
 
-No se modificaron motor, API, servicio ni frontend en este paso. Solo actividad 6; prohibido implementar o preparar actividad 8. Al cerrar la integración, actualizar este estado con archivos, pruebas, resultados y pendientes reales.
+## Para el compañero de frontend
+
+Empezar por [guia-frontend-fcfs.md](docs/guia-frontend-fcfs.md), que incluye las respuestas completas y sus secuencias de reproducción.
+
+Usar [contrato-api.md](docs/contrato-api.md) y sus ejemplos FCFS. Se mantienen rutas y acciones interrupt/error/pause/continue. `en_espera` es listos en orden FCFS; mostrar nuevos desde `nuevos.length`, memoria desde `memoria_ocupada` (máximo 3) y bloqueos actuales desde `bloqueo_transcurrido`/`bloqueo_restante`. `bloqueado` es acumulado, `ejecutado` es servicio y error se presenta como ERROR aunque resultado sea null.
+
+CPU null con running y bloqueados es válido: continuar consultando hasta completed. Tomar todos los tiempos del servidor y distinguir null de cero. No usar lote/lote_actual/lotes_pendientes ni recalcular tiempos. Falta adaptar paneles, controles I/E/P/C y tabla final, y comprobar visualmente nuevos, bloqueo, CPU libre, pausa, error, final normal y recarga. Solo actividad 6; nada de actividad 8.

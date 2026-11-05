@@ -59,10 +59,14 @@ Solo dentro de `bloqueados` se agregan `bloqueo_transcurrido` y `bloqueo_restant
 
 Se eliminaron `lote`, `lote_actual` y `lotes_pendientes` de la respuesta. No agregar valores ficticios para conservar la pantalla anterior. En completed: CPU null, listas de nuevos/listos/bloqueados vacías, memoria 0 y resultados conservados.
 
-## Ejemplos y alcance verificado
+## Ejemplos reproducibles y comprobaciones
 
-Los cuatro JSON de [cambios-backend-fcfs.md](cambios-backend-fcfs.md#ejemplos-obtenidos-del-motor) son salidas reales y comprobadas del motor. La respuesta HTTP añade un ID generado por el servicio; no se fija un ID ilustrativo como si fuera real.
+Para implementar la pantalla, empezar por [la guía de frontend](guia-frontend-fcfs.md): incluye campos y tiempos, representación de estados y cuatro respuestas HTTP completas capturadas y contrastadas con el motor, con su secuencia de reproducción.
 
-`contrato-api.json` y `fixtures/motor-inicial.json` siguen siendo fixtures históricos de lotes. **No son ejemplos FCFS.** El siguiente paso de API debe reemplazarlos o retirarlos de sus consumidores y mantener su procedencia reproducible.
+`fixtures/motor-inicial.json` es el snapshot de `SimulationEngine.create(4, seed=123).snapshot()`. `contrato-api.json` es una respuesta inicial real generada con `await SimulationService(auto_clock=False).create(4, seed=123)`: contiene un UUID generado por el servicio, que cambiará en cada creación. Ambos reemplazan los ejemplos históricos de lotes. `test_fcfs_json_examples_are_reproducible` compara todos los campos, excluyendo únicamente el UUID variable del ejemplo HTTP.
 
-Las pruebas existentes verifican creación/consulta, validaciones, acciones básicas, CPU libre con bloqueados y cierre de tareas. No cubren por sí solas el contrato completo de tiempos en todas las rutas, concurrencia y desbloqueo del servicio. Completar los casos de [la entrega](entrega-motor.md#criterios-para-cerrar-api). No se declara terminada esa integración ni la pantalla con esta actualización del contrato escrito.
+Los cuatro ejemplos de [la guía del motor](cambios-backend-fcfs.md#ejemplos-obtenidos-del-motor) siguen siendo válidos; HTTP agrega únicamente `simulacion_id`.
+
+`tests/test_api_fcfs.py`, `test_api.py` y `test_service.py` comprueban creación con cuatro procesos, snapshot completo en cada ruta, orden FCFS, null y cero, admisión normal/por error, bloqueo de tres residentes, segundos 9/10, pausa con CPU y con todos bloqueados, consultas sin avance, errores sin mutaciones, tiempos conocidos, finalización, aislamiento, lock compartido y cierre. La tarea automática se prueba con pulsos controlados de su espera de un segundo, sin esperar segundos reales. Al completar el último tick la tarea termina; `close()` cancela las restantes y libera los registros. Las acciones desconocidas directas del servicio generan ValueError; HTTP las rechaza antes con 422.
+
+El reloj automático puede avanzar entre dos GET por el paso del tiempo; consultar no origina ticks. No se ha validado la interfaz FCFS ni un recorrido de navegador con reloj real en este paso.

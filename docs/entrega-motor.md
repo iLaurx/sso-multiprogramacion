@@ -1,6 +1,8 @@
-# Entrega del motor y siguientes integraciones — Actividad 6
+# Entrega para frontend — Actividad 6
 
 Punto de partida para el desarrollador de API. Materia: **Sistemas Operativos**. Rama compartida: `feature/fcfs`. La entrega del motor se publicó hasta `383a46f`; esta actualización documental es posterior y permanece local hasta que el usuario solicite compartirla.
+
+Integración API/servicio completada el 4 de noviembre de 2026: criterios siguientes comprobados mediante pruebas deterministas HTTP y de servicio, incluida la tarea automática con tiempo controlado. Los JSON ya son FCFS. Esta guía conserva los criterios de entrega; el estado vigente y los pendientes de frontend están en [estado.md](../estado.md).
 
 ## Orden de lectura
 
@@ -13,16 +15,18 @@ Antes de trabajar, comprobar `git status` y `git branch --show-current`. Actuali
 | Área | Estado | Responsabilidad siguiente |
 | --- | --- | --- |
 | Motor `simulation/` | Terminado y revisado: FCFS, colas, tres residentes, I de 10 segundos, E, P/C, tiempos y snapshot. | Conservar el contrato; corregir solo fallos concretos reproducidos. |
-| API `backend/routes.py`, `schemas.py` | Existen creación, consulta y acciones con validación y errores. | Verificar el esquema FCFS de extremo a extremo y documentarlo. |
-| Servicio `backend/service.py` | Ya conserva motores, reloj, exclusión mutua e ID externo; transmite snapshot. | Probar tiempos, bloqueos y concurrencia a través del servicio. No duplicar el planificador. |
+| API `backend/routes.py`, `schemas.py` | Creación, consulta y acciones comprobadas mediante HTTP en proceso. | Consumir el contrato sin campos de lotes. |
+| Servicio `backend/service.py` | Reloj, locks, tiempos, bloqueos y concurrencia comprobados en las pruebas actuales. | Conservar un solo reloj del servidor. |
 | Frontend `frontend/` | Todavía utiliza lotes y no representa FCFS correctamente. | Adaptar paneles, controles y tabla final después de fijar la integración HTTP. |
-| Documentación y fixtures | Guías Markdown actualizadas. Los dos JSON antiguos siguen siendo de lotes. | API debe sustituir esos fixtures por salidas reproducibles FCFS y revisar consumidores. |
+| Documentación y fixtures | Los dos JSON ya son FCFS reproducibles. La guía de frontend incluye cuatro respuestas HTTP completas reales. | Usar los ejemplos actuales y retirar dependencias de lotes en pantalla. |
 
 El import público sigue siendo `from simulation import SimulationEngine, SimulationStateError`. `create()` devuelve el motor; tick, interrupt, fail, pause y resume devuelven None. Consultar snapshot después de cada acción. Los métodos y cuatro ejemplos completos están en [cambios-backend-fcfs.md](cambios-backend-fcfs.md).
 
 El modelo/generador conservan `lote` internamente por compatibilidad. No afecta FCFS ni aparece en la respuesta: no es un bloqueo para integrar API.
 
-## Siguiente trabajo de API y servicio
+## Reglas de API y servicio ya comprobadas
+
+La lista siguiente conserva los criterios utilizados para cerrar la integración. No son tareas de implementación pendientes. El compañero de frontend debe empezar por [guia-frontend-fcfs.md](guia-frontend-fcfs.md).
 
 1. Revisar el código existente y sus pruebas antes de añadir componentes. Conservar las rutas de creación, GET y actions de [contrato-api.md](contrato-api.md).
 2. Comprobar que todas las respuestas mantienen las claves y valores del snapshot, añadiendo solo `simulacion_id`. Si se introducen modelos de respuesta, deben aceptar new/blocked, tiempos null, CPU null en running y los campos adicionales exclusivos de bloqueados.
@@ -76,6 +80,6 @@ Si una prueba de integración detecta un fallo del motor, entregar la secuencia 
 
 En la revisión del motor: **79 pruebas del motor y 94 de la suite completa aprobadas**. Se comprobaron los cuatro ejemplos reales de snapshot, casos conocidos de tiempos, colas, memoria, bloqueos simultáneos/repetidos, controles y pausa. Comandos en [README](../README.md#pruebas).
 
-La suite actual de API comprueba varios recorridos básicos, pero no sustituye todos los criterios anteriores. No se verificó el recorrido HTTP completo con reloj real ni la adaptación visual. La tarea automática sigue siendo parte de las verificaciones que debe cerrar el compañero de API.
+En la revisión actual pasaron 23 pruebas de API/servicio y 105 de la suite completa. La tarea automática se comprobó con tiempo controlado; las rutas se probaron con TestClient. Además se capturaron cuatro respuestas HTTP completas y se compararon contra el motor real para la guía de frontend. No se verificó el recorrido de navegador con reloj real, el despliegue ni la adaptación visual. Persisten los avisos de caché pytest y deprecación Starlette/HTTPX. No se cambió implementación en esta revisión documental.
 
 Solo actividad 6. No agregar procesos durante ejecución, N, B, tabla BCP, bloqueo de 9 segundos, otro motor permanente ni un selector. No se propone cambiar tecnologías, añadir una base de datos o desplegar en este paso.

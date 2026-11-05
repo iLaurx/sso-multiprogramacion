@@ -2,11 +2,11 @@
 
 Guía del motor implementado de **Sistemas Operativos**. Describe el código actual de `simulation/`, no una propuesta. Es la referencia Python para integrar FCFS; `contrato-api.md` describe su envoltura HTTP. No se modificaron API ni frontend en este paso.
 
-La integración siguiente y sus criterios de aceptación están en [entrega-motor.md](entrega-motor.md). El [contrato HTTP](contrato-api.md) ya se actualizó por escrito al código existente; aún falta cerrar las verificaciones de integración indicadas allí. Esta guía conserva los ejemplos y el contrato Python del motor.
+La integración API/servicio se comprobó con las pruebas indicadas en [estado.md](../estado.md). Para el siguiente paso usar [la guía de frontend](guia-frontend-fcfs.md) y el [contrato HTTP](contrato-api.md). Esta guía conserva el contrato Python y la revisión histórica del motor; las menciones posteriores a integración pendiente describen aquella entrega, no el estado vigente. La pantalla y el recorrido de navegador con reloj real siguen pendientes.
 
 ## Por dónde empezar en API
 
-1. Usar esta guía y sus cuatro snapshots como referencia del motor. `fcfs.md` explica las reglas; `contrato-api.md` documenta las rutas actuales. Su JSON separado `contrato-api.json` todavía es de lotes y debe reemplazarse al integrar.
+1. Usar esta guía y sus cuatro snapshots como referencia del motor. `fcfs.md` explica las reglas; `contrato-api.md` documenta las rutas actuales. Su JSON separado `contrato-api.json` ya contiene un ejemplo FCFS reproducible; ver estado.md para la entrega vigente.
 2. Revisar el recorrido ya existente: rutas → servicio → `SimulationEngine`. Mantener `simulacion_id` en el servicio y el reloj bajo su control; GET solo consulta. El motor no necesita un segundo planificador ni un reloj adicional.
 3. Revisar los esquemas de respuesta o consumidores del equipo: quitar campos de lotes, admitir `new`/`blocked`, tiempos con null y `en_ejecucion: null` aun en running. No traducir null a cero. Las listas conservan el orden recibido.
 4. Comprobar las acciones con los nombres HTTP actuales: `interrupt` → `interrupt()`, `error` → `fail()`, `pause` → `pause()` y `continue` → `resume()`. Con todos bloqueados, I/E deben producir conflicto, sin cerrar la simulación ni impedir P/C.

@@ -2,7 +2,7 @@
 
 Simulador educativo de **Sistemas Operativos**, en adaptación de la aplicación de lotes a FCFS. Se conserva Python, FastAPI y HTML/CSS/JavaScript.
 
-**Estado actual:** motor FCFS terminado y revisado. API y servicio ya existen y transmiten sus datos; queda verificar la integración completa y adaptar la interfaz, que todavía muestra lotes. No considerar terminada la aplicación web por estar terminado el motor.
+**Estado actual:** motor y API/servicio FCFS comprobados; falta adaptar la interfaz que sigue mostrando lotes. Ver [estado.md](estado.md).
 
 ## Para el siguiente desarrollador
 
@@ -14,7 +14,7 @@ Trabajamos sobre `feature/fcfs`. Antes de editar, comprobar la rama y los cambio
 4. [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md): métodos del motor, campos y snapshots reales.
 5. [docs/contrato-api.md](docs/contrato-api.md): rutas existentes, respuesta HTTP y diferencias con el contrato anterior.
 
-[fcfs.md](fcfs.md) conserva las reglas de la actividad. `Manual-instructions.md`, `docs/contrato-api.json` y `docs/fixtures/motor-inicial.json` son antecedentes de lotes; los JSON aún deben reemplazarse al integrar API.
+[fcfs.md](fcfs.md) conserva las reglas. `Manual-instructions.md` es el manual anterior; los dos JSON en docs ya son ejemplos FCFS reproducibles.
 
 ## Comportamiento del motor implementado
 
@@ -57,7 +57,7 @@ Motor y ejemplos documentados:
 .\.venv\Scripts\python.exe -m pytest -q tests/test_engine.py tests/test_models.py tests/test_times.py tests/test_snapshot_fcfs.py tests/test_fcfs_handoff.py
 ```
 
-Revisión del motor: 79 pruebas aprobadas; suite completa: 94. Esto no acredita la interfaz FCFS ni todas las pruebas de integración pendientes. Consultar [estado.md](estado.md) para las comprobaciones vigentes.
+Motor: 79 pruebas aprobadas; API/servicio: 23; suite completa: 105. La interfaz FCFS sigue pendiente. Ver [estado.md](estado.md).
 
 ## Estructura
 
