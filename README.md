@@ -2,11 +2,11 @@
 
 Simulador educativo de **Sistemas Operativos**, en adaptación de la aplicación de lotes a FCFS. Se conserva Python, FastAPI y HTML/CSS/JavaScript.
 
-**Estado actual:** motor y API/servicio FCFS comprobados; falta adaptar la interfaz que sigue mostrando lotes. Ver [estado.md](estado.md).
+**Estado actual:** motor, API y frontend FCFS integrados localmente y comprobados en navegador con reloj real. Ver [estado.md](estado.md).
 
 ## Para el siguiente desarrollador
 
-Trabajamos sobre `feature/fcfs`. Antes de editar, comprobar la rama y los cambios locales; respetar el trabajo de los demás.
+La integración está en `codex/integracion-fcfs-frontend`, basada en `feature/fcfs`. Antes de editar, comprobar la rama y los cambios locales; respetar el trabajo de los demás.
 
 1. [AGENTS.md](AGENTS.md): alcance y reglas de trabajo.
 2. [estado.md](estado.md): qué quedó terminado y qué sigue.
@@ -39,7 +39,7 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload
 ```
 
-Si ya existe un entorno instalado, basta con ejecutar Uvicorn. Aplicación: [http://127.0.0.1:8000](http://127.0.0.1:8000). Documentación HTTP: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). La interfaz actual todavía necesita los cambios FCFS indicados arriba.
+Si ya existe un entorno instalado, basta con ejecutar Uvicorn. Aplicación: [http://127.0.0.1:8000](http://127.0.0.1:8000). Documentación HTTP: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). La interfaz muestra nuevos, listos, CPU, bloqueados y terminados con los tiempos del servidor.
 
 No requiere base de datos ni Node.js. Las simulaciones viven en memoria y se pierden al reiniciar el servidor, incluido un reinicio por `--reload`. Usar un solo worker. El servicio controla el reloj y la exclusión mutua por simulación; el motor no es seguro para acceso concurrente por sí solo.
 
@@ -57,15 +57,17 @@ Motor y ejemplos documentados:
 .\.venv\Scripts\python.exe -m pytest -q tests/test_engine.py tests/test_models.py tests/test_times.py tests/test_snapshot_fcfs.py tests/test_fcfs_handoff.py
 ```
 
-Motor: 79 pruebas aprobadas; API/servicio: 23; suite completa: 105. La interfaz FCFS sigue pendiente. Ver [estado.md](estado.md).
+Motor: 79 pruebas aprobadas; API/servicio: 23; suite completa: 105. El recorrido de navegador FCFS también se comprobó localmente. Ver [estado.md](estado.md).
+
+Recorrido de navegador opcional (requiere Playwright instalado y Chrome local o Chromium de Playwright): con el servidor iniciado, ejecutar `python tests/browser_fcfs.py http://127.0.0.1:8000` usando el intérprete del entorno. Usa segundos reales, genera evidencia en `tmp/fcfs-browser/` y no añade dependencias de navegador al servidor.
 
 ## Estructura
 
 | Carpeta | Responsabilidad |
 | --- | --- |
 | `simulation/` | Motor FCFS, modelo y generación. Entregado. |
-| `backend/` | Rutas, validaciones, servicio y reloj. Integración por verificar. |
-| `frontend/` | Interfaz y controles. Pendiente de adaptar a FCFS. |
+| `backend/` | Rutas, validaciones, servicio y reloj. Integración comprobada localmente. |
+| `frontend/` | Interfaz y controles. FCFS integrado y comprobado localmente. |
 | `tests/` | Pruebas de motor, API, servicio y archivos estáticos. |
 | `docs/` | Contrato, entrega y ejemplos del motor. |
 

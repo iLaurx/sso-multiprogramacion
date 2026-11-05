@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Multiprogramación por lotes</title>
+  <title>Simulador de procesos FCFS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -566,7 +566,7 @@
     /* Tablas de Procesos (Dos Columnas, Imagen 2) */
     .tables-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 20px;
     }
 
@@ -672,6 +672,67 @@
       border-bottom: 1px dashed var(--border-subtle);
     }
 
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .state-column {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: #080c16;
+    }
+
+    .state-column h3 {
+      margin: 0 0 10px;
+      color: var(--cyan);
+      font-size: 11px;
+      letter-spacing: .7px;
+    }
+
+    .state-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 230px;
+      min-height: 54px;
+      overflow: auto;
+    }
+
+    .state-process {
+      padding: 9px;
+      border: 1px solid var(--border-subtle);
+      border-left: 3px solid var(--cyan);
+      border-radius: 3px;
+      color: var(--text-main);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .state-process.blocked { border-left-color: #fbbf24; }
+    .state-process.finished { border-left-color: var(--green); }
+    .state-process.error { border-left-color: var(--pink); }
+    .state-empty { color: var(--text-dim); font-size: 12px; }
+
+    .three-panel {
+      background: #080c16;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    #escena { width: 100%; height: 280px; }
+    #escena canvas { display: block; width: 100%; height: 100%; }
+    .three-legend { padding: 10px 14px; color: var(--text-dim); font-size: 11px; }
+
+    .table-box { min-width: 0; }
+    .table-scroll { overflow-x: auto; }
+    .summary-table { min-width: 1080px; }
+
     /* Pie de Página */
     footer {
       font-size: 11px;
@@ -687,6 +748,7 @@
       .tables-row {
         grid-template-columns: 1fr;
       }
+      .state-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .blueprint-grid {
         grid-template-columns: 1fr;
         justify-items: center;
@@ -696,6 +758,11 @@
         transform: rotate(90deg);
         margin: 10px 0;
       }
+    }
+
+    @media (max-width: 560px) {
+      .state-grid { grid-template-columns: 1fr; }
+      #escena { height: 230px; }
     }
   </style>
 </head>
@@ -707,11 +774,11 @@
       <div class="hero-top-row">
         <div>
           <h1 class="hero-title">
-            Multiprogramación<br>
-            <span class="hero-subtitle">por lotes</span>
+            Simulador<br>
+            <span class="hero-subtitle">FCFS</span>
           </h1>
           <p class="hero-desc">
-            Simulador de procesos con operaciones aritméticas organizados en lotes. Consulta la cola de espera, los tiempos de ejecución y los resultados de cada trabajo.
+            La CPU atiende los procesos en orden de llegada. Sigue sus cinco estados, el uso de memoria, los bloqueos de E/S y sus tiempos.
           </p>
         </div>
         <div class="api-pill">
@@ -738,7 +805,7 @@
         </div>
 
         <div class="config-note">
-          datos aleatorios · TME de 7 a 18 s · máximo 3 por lote
+          procesos aleatorios · TME de 7 a 18 s · máximo 3 en memoria
         </div>
 
         <div id="mensaje" role="status" aria-live="polite">
@@ -755,13 +822,13 @@
       </div>
 
       <div class="metric-card">
-        <span class="metric-title">LOTE ACTUAL</span>
-        <div class="metric-value"><span id="loteActual">—</span></div>
+        <span class="metric-title">MEMORIA OCUPADA</span>
+        <div class="metric-value"><span id="memoriaOcupada">0</span> / <span id="capacidadMemoria">3</span></div>
       </div>
 
       <div class="metric-card">
-        <span class="metric-title">LOTES PENDIENTES</span>
-        <div class="metric-value"><span id="lotesPendientes">0</span></div>
+        <span class="metric-title">PROCESOS NUEVOS</span>
+        <div class="metric-value"><span id="cantidadNuevos">0</span></div>
       </div>
 
       <div class="metric-card">
@@ -774,55 +841,25 @@
     <section class="diagram-panel">
       <div>
         <div class="diagram-tag">COLA → CPU → RESULTADOS</div>
-        <h2 class="diagram-title">Multiprogramación por lotes</h2>
-        <p class="diagram-subtitle">Los procesos entran por ID. El siguiente lote entra cuando termina todo el actual.</p>
+        <h2 class="diagram-title">Estados de los procesos · FCFS</h2>
+        <p class="diagram-subtitle">La CPU toma el primero de listos. La memoria admite hasta tres procesos; los bloqueados siguen ocupándola.</p>
       </div>
 
-      <div class="blueprint-grid">
-        <!-- Columna 1: Cola del Lote Actual -->
-        <div>
-          <div class="col-header pink">COLA DEL LOTE ACTUAL</div>
-          <div id="procesosEspera" class="cola-container">
-            <div style="font-size: 12px; color: var(--text-dim);">Cola vacía.</div>
-          </div>
-        </div>
+      <div class="state-grid" aria-label="Colas por estado de proceso">
+        <section class="state-column"><h3>NUEVOS · fuera de memoria</h3><div id="estadoNuevos" class="state-list"></div></section>
+        <section class="state-column"><h3>LISTOS · orden FCFS</h3><div id="estadoListos" class="state-list"></div></section>
+        <section class="state-column"><h3>CPU · ejecución</h3><div id="estadoCpu" class="state-list"></div></section>
+        <section class="state-column"><h3>BLOQUEADOS · E/S</h3><div id="estadoBloqueados" class="state-list"></div></section>
+        <section class="state-column"><h3>TERMINADOS</h3><div id="estadoTerminados" class="state-list"></div></section>
+      </div>
 
-        <!-- Chevrons 1 -->
-        <div id="chevronsIn" class="flow-chevrons pink">
-          <span>&gt;</span><span>&gt;</span><span>&gt;</span>
-        </div>
-
-        <!-- Columna 2: Una Sola CPU -->
-        <div>
-          <div class="col-header cyan">UNA SOLA CPU</div>
-          <div id="procesoActual" class="cpu-box">
-            <div class="cpu-proc-title">CPU LIBRE</div>
-            <div class="cpu-proc-op">—</div>
-            <div class="cpu-proc-time">Esperando proceso...</div>
-            <div class="cpu-progress-track">
-              <div class="cpu-progress-fill" style="width: 0%;"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Chevrons 2 -->
-        <div id="chevronsOut" class="flow-chevrons green">
-          <span>&gt;</span><span>&gt;</span><span>&gt;</span>
-        </div>
-
-        <!-- Columna 3: Terminados -->
-        <div>
-          <div class="col-header green">TERMINADOS</div>
-          <div id="terminadosDiagrama" class="terminados-container">
-            <div style="font-size: 12px; color: var(--text-dim);">Sin terminados.</div>
-          </div>
-          <!-- Contenedor oculto para compatibilidad con selectores de pruebas -->
-          <div id="procesosTerminados" style="display: none;"></div>
-        </div>
+      <div class="three-panel" aria-label="Visualización 3D de los procesos por estado">
+        <div id="escena"></div>
+        <div class="three-legend">Vista 3D: nuevos · listos · CPU · bloqueados · terminados</div>
       </div>
 
       <div class="diagram-footer-text">
-        I: regresa a la cola y conserva lo ejecutado. E: sale por error.
+        <span id="ayudaInterrupcion">I: bloquea el proceso actual durante 10 segundos simulados por E/S. E: termina el proceso con ERROR.</span>
       </div>
 
       <!-- Detalle de Ejecución en Línea -->
@@ -838,19 +875,19 @@
           Iniciar emulación
         </button>
 
-        <button id="btnInterrupt" class="btn-ctrl pink-btn" data-action="interrupt" title="Interrumpir proceso actual (E/S)">
-          <kbd>I</kbd> Interrumpir I/E
+        <button id="btnInterrupt" class="btn-ctrl pink-btn" data-action="interrupt" title="Bloquear proceso actual por 10 segundos simulados (E/S)" disabled>
+          <kbd>I</kbd> Bloquear por E/S
         </button>
 
-        <button id="btnError" class="btn-ctrl pink-btn" data-action="error" title="Terminar proceso actual por error">
+        <button id="btnError" class="btn-ctrl pink-btn" data-action="error" title="Terminar proceso actual por error" disabled>
           <kbd>E</kbd> Error
         </button>
 
-        <button id="btnPause" class="btn-ctrl cyan-btn" data-action="pause" title="Pausar simulación">
+        <button id="btnPause" class="btn-ctrl cyan-btn" data-action="pause" title="Pausar simulación" disabled>
           <kbd>P</kbd> Pausa
         </button>
 
-        <button id="btnContinue" class="btn-ctrl cyan-btn" data-action="continue" title="Continuar simulación">
+        <button id="btnContinue" class="btn-ctrl cyan-btn" data-action="continue" title="Continuar simulación" disabled>
           <kbd>C</kbd> Continuar
         </button>
 
@@ -866,52 +903,35 @@
 
     <!-- Tablas en Paralelo (Imagen 2) -->
     <section class="tables-row">
-      <!-- Tabla Izquierda: Procesos del Lote Actual -->
       <div class="table-box">
-        <div class="table-tag cyan">SIGUE LOS TIEMPOS</div>
-        <h3 class="table-title">Procesos del lote actual</h3>
-        <p class="table-desc">La cola y el proceso en CPU están en el diagrama. Aquí puedes revisar todo el lote.</p>
-
-        <table class="data-table">
+        <div class="table-tag cyan">RESUMEN DE PROCESOS</div>
+        <h3 class="table-title">Tiempos y resultados</h3>
+        <p class="table-desc">Los tiempos se reciben del servidor. Un guion indica que aún no se conoce el valor.</p>
+        <div class="table-scroll"><table class="data-table summary-table">
           <thead>
             <tr>
               <th>ID</th>
               <th>Estado</th>
               <th>Operación</th>
               <th>TME</th>
-              <th>Usado</th>
-              <th>Restante</th>
-            </tr>
-          </thead>
-          <tbody id="tbodyLoteActual">
-            <tr>
-              <td colspan="6" style="color: var(--text-dim); text-align: center; padding: 20px;">Sin datos de lote.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Tabla Derecha: Trabajos Terminados -->
-      <div class="table-box">
-        <div class="table-tag pink">SALIDA DE TODOS LOS LOTES</div>
-        <h3 class="table-title">Trabajos terminados</h3>
-        <p class="table-desc">Un error termina el proceso inmediatamente y no produce un resultado.</p>
-
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Lote</th>
-              <th>Operación</th>
               <th>Resultado</th>
+              <th>Llegada</th>
+              <th>Primera atención</th>
+              <th>Finalización</th>
+              <th>Retorno</th>
+              <th>Respuesta</th>
+              <th>Espera</th>
+              <th>Servicio</th>
+              <th>Bloqueo actual</th>
+              <th>Bloqueo acumulado</th>
             </tr>
           </thead>
-          <tbody id="tbodyTerminados">
+          <tbody id="tbodyResumen">
             <tr>
-              <td colspan="4" style="color: var(--text-dim); text-align: center; padding: 20px;">Todavía no hay trabajos terminados.</td>
+              <td colspan="14" style="color: var(--text-dim); text-align: center; padding: 20px;">Sin procesos.</td>
             </tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
     </section>
 
@@ -936,6 +956,8 @@
     </footer>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="/visualizacion.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

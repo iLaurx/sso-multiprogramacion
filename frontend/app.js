@@ -1,5 +1,4 @@
-// Lógica del Simulador SSO Multiprogramación por lotes
-// Estilo Blueprint HUD inspirado en el diseño del sistema operativo
+// Interfaz de simulación FCFS; el servidor conserva la autoridad de estados y tiempos.
 
 const API = "/api";
 const ENDPOINT_HEALTH = "/api/health"; // Requerido para verificación en pytest
@@ -12,22 +11,22 @@ const elementos = {
   btnIniciarEmulacion: document.querySelector("#btnIniciarEmulacion"),
   mensaje: document.querySelector("#mensaje"),
   reloj: document.querySelector("#reloj"),
-  loteActual: document.querySelector("#loteActual"),
-  lotesPendientes: document.querySelector("#lotesPendientes"),
+  memoriaOcupada: document.querySelector("#memoriaOcupada"),
+  capacidadMemoria: document.querySelector("#capacidadMemoria"),
+  cantidadNuevos: document.querySelector("#cantidadNuevos"),
   totalTrabajos: document.querySelector("#totalTrabajos"),
   metricTerminados: document.querySelector("#metricTerminados"),
   estadoSimulacion: document.querySelector("#estadoSimulacion"),
   estadoControles: document.querySelector("#estadoControles"),
-  procesosEspera: document.querySelector("#procesosEspera"),
-  procesoActual: document.querySelector("#procesoActual"),
-  terminadosDiagrama: document.querySelector("#terminadosDiagrama"),
-  procesosTerminados: document.querySelector("#procesosTerminados"), // Compatibilidad
-  chevronsIn: document.querySelector("#chevronsIn"),
-  chevronsOut: document.querySelector("#chevronsOut"),
+  estadoNuevos: document.querySelector("#estadoNuevos"),
+  estadoListos: document.querySelector("#estadoListos"),
+  estadoCpu: document.querySelector("#estadoCpu"),
+  estadoBloqueados: document.querySelector("#estadoBloqueados"),
+  estadoTerminados: document.querySelector("#estadoTerminados"),
   detalleEjecucion: document.querySelector("#detalleEjecucion"),
   bannerTexto: document.querySelector("#bannerTexto"),
-  tbodyLoteActual: document.querySelector("#tbodyLoteActual"),
-  tbodyTerminados: document.querySelector("#tbodyTerminados"),
+  ayudaInterrupcion: document.querySelector("#ayudaInterrupcion"),
+  tbodyResumen: document.querySelector("#tbodyResumen"),
   historialEventos: document.querySelector("#historialEventos"),
   btnInterrupt: document.querySelector("#btnInterrupt"),
   btnError: document.querySelector("#btnError"),
@@ -40,8 +39,9 @@ let snapshotActual = null;
 let ocupado = false;
 let colaPeticiones = Promise.resolve();
 let temporizador = null;
-let procesoCpuAnterior = null;
 let historialLog = [];
+let estadosAnteriores = new Map();
+let estadoSimulacionAnterior = null;
 
 // ==========================================
 // 1. Registro de Eventos e Historial
@@ -60,9 +60,13 @@ function registrarEvento(texto) {
   }
 
   if (elementos.historialEventos) {
-    elementos.historialEventos.innerHTML = historialLog
-      .map(item => `<div class="history-entry">${item}</div>`)
-      .join("");
+    elementos.historialEventos.replaceChildren();
+    historialLog.forEach(item => {
+      const entrada = document.createElement("div");
+      entrada.className = "history-entry";
+      entrada.textContent = item;
+      elementos.historialEventos.appendChild(entrada);
+    });
   }
 }
 
@@ -98,7 +102,7 @@ async function solicitar(ruta, opciones = {}) {
       limpiarSimulacion();
       throw { detail: "La simulación ya no existe. Inicia una nueva." };
     }
-    throw datos;
+    throw { ...datos, status: respuesta.status };
   }
   return datos;
 }
@@ -133,231 +137,177 @@ function formatearOperacion(proceso) {
   return `${proceso.operando_a} ${proceso.operacion} ${proceso.operando_b}`;
 }
 
-function renderizarDiagrama(snapshot) {
-  const isRunning = snapshot.estado === "running";
-  const procCpu = snapshot.en_ejecucion;
+function procesarListas(snapshot) {
+  const nuevos = Array.isArray(snapshot.nuevos) ? snapshot.nuevos : [];
+  const listos = snapshot.en_espera || [];
+  const cpu = snapshot.en_ejecucion ? [snapshot.en_ejecucion] : [];
+  const bloqueados = Array.isArray(snapshot.bloqueados) ? snapshot.bloqueados : [];
+  const terminados = Array.isArray(snapshot.terminados) ? snapshot.terminados : [];
+  return { nuevos, listos, cpu, bloqueados, terminados };
+}
 
-  // 1. Cola de Espera (Diagrama)
-  elementos.procesosEspera.replaceChildren();
-  if (!snapshot.en_espera || snapshot.en_espera.length === 0) {
-    elementos.procesosEspera.innerHTML = `<div style="font-size: 12px; color: var(--text-dim); padding: 8px 0;">Cola vacía.</div>`;
-  } else {
-    snapshot.en_espera.forEach(p => {
-      const card = document.createElement("div");
-      card.className = "cola-card";
-      card.innerHTML = `
-        <div class="cola-card-title">P${p.id}</div>
-        <div class="cola-card-time">${p.restante}s</div>
-      `;
-      elementos.procesosEspera.appendChild(card);
-    });
+function mostrarValor(valor, unidad = "s") {
+  return valor === null || valor === undefined ? "—" : `${valor}${unidad}`;
+}
+
+function textoEstado(proceso, estadoLista) {
+  if (estadoLista === "finished" && proceso.estado === "error") return "Terminado · ERROR";
+  return ({ new: "Nuevo", ready: "Listo", running: "En CPU", blocked: "Bloqueado", finished: "Terminado", error: "Terminado · ERROR" })[estadoLista] || estadoLista;
+}
+
+function dibujarColumna(contenedor, procesos, estado, vacio) {
+  if (!contenedor) return;
+  contenedor.replaceChildren();
+  if (!procesos.length) {
+    const mensaje = document.createElement("div");
+    mensaje.className = "state-empty";
+    mensaje.textContent = vacio;
+    contenedor.appendChild(mensaje);
+    return;
+  }
+  procesos.forEach(proceso => {
+    const tarjeta = document.createElement("article");
+    const esError = proceso.estado === "error";
+    tarjeta.className = `state-process ${estado === "blocked" ? "blocked" : ""} ${estado === "finished" ? "finished" : ""} ${esError ? "error" : ""}`.trim();
+    const restanteBloqueo = proceso.bloqueo_restante;
+    const detalle = estado === "blocked"
+      ? `Bloqueado ${mostrarValor(proceso.bloqueo_transcurrido)} · faltan ${mostrarValor(restanteBloqueo)}`
+      : estado === "finished"
+        ? (esError ? "ERROR" : `Resultado: ${mostrarValor(proceso.resultado, "")}`)
+        : estado === "running"
+          ? `TME ${mostrarValor(proceso.tme)} · servicio ${mostrarValor(proceso.ejecutado)} · restante ${mostrarValor(proceso.restante)}`
+          : `TME ${mostrarValor(proceso.tme)} · restante ${mostrarValor(proceso.restante)}`;
+    tarjeta.textContent = `P${proceso.id} · ${formatearOperacion(proceso)} · ${detalle}`;
+    contenedor.appendChild(tarjeta);
+  });
+}
+
+function renderizarDiagrama(snapshot, listas) {
+  const idle = snapshot.estado === "completed" ? "Todos los procesos terminaron."
+    : snapshot.estado === "paused" ? "CPU libre; simulación pausada."
+    : listas.bloqueados.length ? "CPU libre; los bloqueos siguen avanzando." : "Esperando proceso listo.";
+  dibujarColumna(elementos.estadoNuevos, listas.nuevos, "new", "Sin procesos nuevos.");
+  dibujarColumna(elementos.estadoListos, listas.listos, "ready", "Sin procesos listos.");
+  dibujarColumna(elementos.estadoCpu, listas.cpu, "running", listas.cpu.length ? "" : idle);
+  dibujarColumna(elementos.estadoBloqueados, listas.bloqueados, "blocked", "Sin procesos bloqueados.");
+  dibujarColumna(elementos.estadoTerminados, listas.terminados, "finished", "Sin procesos terminados.");
+
+  if (elementos.detalleEjecucion) {
+    const cpu = snapshot.en_ejecucion;
+    elementos.detalleEjecucion.textContent = cpu
+      ? `P${cpu.id} · ${formatearOperacion(cpu)} · TME ${mostrarValor(cpu.tme)} · servicio ${mostrarValor(cpu.ejecutado)} · restante ${mostrarValor(cpu.restante)}`
+      : idle;
   }
 
-  // 2. CPU Central (Diagrama)
-  if (procCpu) {
-    const porcentaje = procCpu.tme > 0 ? Math.min(100, Math.round((procCpu.ejecutado / procCpu.tme) * 100)) : 0;
-    elementos.procesoActual.className = `cpu-box ${isRunning ? "working" : ""}`;
-    elementos.procesoActual.innerHTML = `
-      <div class="cpu-proc-title">P${procCpu.id} / EN CPU</div>
-      <div class="cpu-proc-op">${formatearOperacion(procCpu)}</div>
-      <div class="cpu-proc-time">${procCpu.ejecutado}s usados / ${procCpu.tme}s</div>
-      <div class="cpu-progress-track">
-        <div class="cpu-progress-fill" style="width: ${porcentaje}%;"></div>
-      </div>
-    `;
-
-    // Detalle bajo el diagrama
-    if (elementos.detalleEjecucion) {
-      elementos.detalleEjecucion.textContent =
-        `P${procCpu.id} · ${formatearOperacion(procCpu)} · TME: ${procCpu.tme} s · Ejecutado: ${procCpu.ejecutado} s · Restante: ${procCpu.restante} s`;
-    }
-  } else {
-    elementos.procesoActual.className = "cpu-box";
-    elementos.procesoActual.innerHTML = `
-      <div class="cpu-proc-title">CPU LIBRE</div>
-      <div class="cpu-proc-op">—</div>
-      <div class="cpu-proc-time">${snapshot.estado === "completed" ? "Lotes finalizados." : "Esperando proceso..."}</div>
-      <div class="cpu-progress-track">
-        <div class="cpu-progress-fill" style="width: 0%;"></div>
-      </div>
-    `;
-    if (elementos.detalleEjecucion) {
-      elementos.detalleEjecucion.textContent = "Ningún proceso activo en CPU";
-    }
-  }
-
-  // 3. Animación de las Flechas (Chevrons)
-  if (isRunning && procCpu) {
-    elementos.chevronsIn.classList.add("working");
-    elementos.chevronsOut.classList.add("working");
-  } else {
-    elementos.chevronsIn.classList.remove("working");
-    elementos.chevronsOut.classList.remove("working");
-  }
-
-  // 4. Terminados (Diagrama)
-  elementos.terminadosDiagrama.replaceChildren();
-  if (!snapshot.terminados || snapshot.terminados.length === 0) {
-    elementos.terminadosDiagrama.innerHTML = `<div style="font-size: 12px; color: var(--text-dim); padding: 8px 0;">Sin terminados.</div>`;
-  } else {
-    // Mostrar hasta los últimos terminados
-    snapshot.terminados.slice(-6).forEach(p => {
-      const card = document.createElement("div");
-      const esError = p.estado === "error";
-      card.className = `terminado-card ${esError ? "error" : ""}`;
-      card.textContent = `P${p.id}: ${esError ? "ERROR" : p.resultado}`;
-      elementos.terminadosDiagrama.appendChild(card);
-    });
+  if (typeof window.dibujarProcesos === "function") {
+    window.dibujarProcesos(listas);
   }
 }
 
-function renderizarTablas(snapshot) {
-  // 1. Tabla: Procesos del lote actual
-  // Incluye terminados del lote actual, el proceso en CPU y los en espera
-  const loteAct = snapshot.lote_actual;
-  const procesosLote = [];
+function todosLosProcesos(listas) {
+  return [
+    ...listas.nuevos.map(p => ({ ...p, _estadoLista: "new" })),
+    ...listas.listos.map(p => ({ ...p, _estadoLista: "ready" })),
+    ...listas.cpu.map(p => ({ ...p, _estadoLista: "running" })),
+    ...listas.bloqueados.map(p => ({ ...p, _estadoLista: "blocked" })),
+    ...listas.terminados.map(p => ({ ...p, _estadoLista: "finished" }))
+  ];
+}
 
-  if (loteAct !== null && loteAct !== undefined) {
-    // Terminados que correspondan al lote actual
-    (snapshot.terminados || []).forEach(p => {
-      if (p.lote === loteAct) {
-        procesosLote.push({ ...p, estadoTexto: p.estado === "error" ? "error" : "terminado" });
-      }
+function renderizarTablaProcesos(listas) {
+  if (!elementos.tbodyResumen) return;
+  const procesos = todosLosProcesos(listas);
+  elementos.tbodyResumen.replaceChildren();
+  if (!procesos.length) {
+    const fila = document.createElement("tr");
+    const celda = document.createElement("td");
+    celda.colSpan = 14;
+    celda.textContent = "Sin procesos.";
+    fila.appendChild(celda);
+    elementos.tbodyResumen.appendChild(fila);
+    return;
+  }
+  const campos = ["llegada", "primera_atencion", "finalizacion", "retorno", "respuesta", "espera", "ejecutado", "bloqueo_transcurrido", "bloqueado"];
+  procesos.forEach(proceso => {
+    const fila = document.createElement("tr");
+    const error = proceso.estado === "error";
+    const valores = [
+      `P${proceso.id}`, textoEstado(proceso, proceso._estadoLista), formatearOperacion(proceso), mostrarValor(proceso.tme),
+      error ? "ERROR" : mostrarValor(proceso.resultado, ""), ...campos.map(campo => mostrarValor(proceso[campo]))
+    ];
+    valores.forEach((valor, indice) => {
+      const celda = document.createElement("td");
+      celda.textContent = valor;
+      if (indice === 1) celda.className = error ? "res-red" : proceso._estadoLista === "finished" ? "res-green" : "";
+      fila.appendChild(celda);
     });
+    elementos.tbodyResumen.appendChild(fila);
+  });
+}
 
-    // Proceso en CPU
-    if (snapshot.en_ejecucion && snapshot.en_ejecucion.lote === loteAct) {
-      procesosLote.push({ ...snapshot.en_ejecucion, estadoTexto: "en CPU" });
+function registrarTransiciones(snapshot, listas) {
+  const actuales = todosLosProcesos(listas);
+  const siguiente = new Map(actuales.map(p => [String(p.id), p._estadoLista]));
+  actuales.forEach(proceso => {
+    const id = `P${proceso.id}`;
+    const antes = estadosAnteriores.get(String(proceso.id));
+    const ahora = proceso._estadoLista;
+    if (!antes && (ahora === "ready" || ahora === "running")) registrarEvento(`${id} entra a memoria.`);
+    else if (antes === "new" && ahora === "ready") registrarEvento(`${id} entra a memoria y pasa a listos.`);
+    else if (antes === "ready" && ahora === "running") registrarEvento(`${id} toma la CPU.`);
+    else if (antes === "running" && ahora === "blocked") registrarEvento(`${id} se bloquea por E/S durante 10 segundos simulados.`);
+    else if (antes === "blocked" && ahora === "ready") registrarEvento(`${id} termina E/S y regresa al final de listos.`);
+    else if (antes === "blocked" && ahora === "running") registrarEvento(`${id} termina E/S, regresa a listos y toma la CPU.`);
+    else if (ahora === "finished" && antes !== "finished") {
+      const error = proceso.estado === "error";
+      registrarEvento(error ? `${id} termina con ERROR.` : `${id} termina; resultado ${proceso.resultado}.`);
     }
-
-    // Procesos en espera
-    (snapshot.en_espera || []).forEach(p => {
-      if (p.lote === loteAct) {
-        procesosLote.push({ ...p, estadoTexto: "en espera" });
-      }
-    });
+  });
+  estadosAnteriores = siguiente;
+  if (estadoSimulacionAnterior !== "completed" && snapshot.estado === "completed") registrarEvento("Simulación completada. Se conserva el resumen final.");
+  if (estadoSimulacionAnterior !== snapshot.estado && ["paused", "running"].includes(snapshot.estado)) {
+    if (snapshot.estado === "paused") registrarEvento("Simulación pausada.");
+    else if (estadoSimulacionAnterior === "paused") registrarEvento("Simulación reanudada.");
   }
-
-  // Ordenar por ID para que la vista sea limpia
-  procesosLote.sort((a, b) => a.id - b.id);
-
-  if (procesosLote.length === 0) {
-    elementos.tbodyLoteActual.innerHTML = `
-      <tr>
-        <td colspan="6" style="color: var(--text-dim); text-align: center; padding: 18px;">
-          ${snapshot.estado === "completed" ? "Todos los lotes completados." : "Sin procesos en el lote actual."}
-        </td>
-      </tr>
-    `;
-  } else {
-    elementos.tbodyLoteActual.innerHTML = procesosLote.map(p => `
-      <tr>
-        <td style="font-weight: 700;">P${p.id}</td>
-        <td style="color: ${p.estadoTexto === 'en CPU' ? 'var(--cyan)' : p.estadoTexto === 'error' ? 'var(--pink)' : p.estadoTexto === 'terminado' ? 'var(--green)' : 'var(--text-muted)'}; font-weight: 600;">
-          ${p.estadoTexto}
-        </td>
-        <td>${formatearOperacion(p)}</td>
-        <td>${p.tme} s</td>
-        <td>${p.ejecutado} s</td>
-        <td>${p.restante} s</td>
-      </tr>
-    `).join("");
-  }
-
-  // 2. Tabla: Trabajos terminados (Salida de todos los lotes)
-  if (!snapshot.terminados || snapshot.terminados.length === 0) {
-    elementos.tbodyTerminados.innerHTML = `
-      <tr>
-        <td colspan="4" style="color: var(--text-dim); text-align: center; padding: 18px;">
-          Todavía no hay trabajos terminados.
-        </td>
-      </tr>
-    `;
-  } else {
-    elementos.tbodyTerminados.innerHTML = snapshot.terminados.map(p => {
-      const esError = p.estado === "error";
-      return `
-        <tr>
-          <td style="font-weight: 700;">P${p.id}</td>
-          <td>${p.lote}</td>
-          <td>${formatearOperacion(p)}</td>
-          <td class="${esError ? 'res-red' : 'res-green'}">
-            ${esError ? 'ERROR' : p.resultado}
-          </td>
-        </tr>
-      `;
-    }).join("");
-  }
+  estadoSimulacionAnterior = snapshot.estado;
 }
 
 function renderizar(snapshot) {
-  const procAnterior = procesoCpuAnterior;
-  const procActual = snapshot.en_ejecucion;
-  procesoCpuAnterior = procActual ? { ...procActual } : null;
-
+  const listas = procesarListas(snapshot);
   snapshotActual = snapshot;
-
-  // Actualizar métricas superiores
-  if (elementos.reloj) elementos.reloj.textContent = snapshot.reloj;
-  if (elementos.loteActual) {
-    const totalLotes = Math.ceil(snapshot.total_trabajos / 3);
-    elementos.loteActual.textContent = snapshot.lote_actual !== null ? `${snapshot.lote_actual} / ${totalLotes}` : `— / ${totalLotes}`;
-  }
-  if (elementos.lotesPendientes) elementos.lotesPendientes.textContent = snapshot.lotes_pendientes;
-  if (elementos.totalTrabajos) elementos.totalTrabajos.textContent = snapshot.total_trabajos;
-  if (elementos.metricTerminados) {
-    elementos.metricTerminados.textContent = snapshot.terminados?.length ?? 0;
-  }
-
-  // Estado general
-  if (elementos.estadoSimulacion) {
-    elementos.estadoSimulacion.textContent = snapshot.estado;
+  const enMemoria = snapshot.memoria_ocupada;
+  const cantidadNuevos = listas.nuevos.length;
+  if (elementos.reloj) elementos.reloj.textContent = mostrarValor(snapshot.reloj, "");
+  if (elementos.memoriaOcupada) elementos.memoriaOcupada.textContent = enMemoria;
+  if (elementos.capacidadMemoria) elementos.capacidadMemoria.textContent = 3;
+  if (elementos.cantidadNuevos) elementos.cantidadNuevos.textContent = cantidadNuevos;
+  if (elementos.totalTrabajos) elementos.totalTrabajos.textContent = snapshot.total_trabajos ?? "—";
+  if (elementos.metricTerminados) elementos.metricTerminados.textContent = listas.terminados.length;
+  if (elementos.estadoSimulacion) elementos.estadoSimulacion.textContent = snapshot.estado;
+  if (elementos.ayudaInterrupcion) {
+    elementos.ayudaInterrupcion.textContent = "I: bloquea el proceso actual durante 10 segundos simulados por E/S. E: termina el proceso con ERROR.";
   }
 
-  // Detección de eventos para el banner
-  if (procAnterior && (!procActual || procActual.id !== procAnterior.id)) {
-    const terminado = snapshot.terminados?.find(t => t.id === procAnterior.id);
-    if (terminado) {
-      if (terminado.estado === "error") {
-        registrarEvento(`P${procAnterior.id} cancelado por error. Libera la CPU.`);
-      } else {
-        registrarEvento(`P${procAnterior.id} termina su operación (${terminado.resultado}). Libera la CPU.`);
-      }
-    } else {
-      registrarEvento(`P${procAnterior.id} sale de la CPU y pasa a la cola de espera.`);
-    }
-  } else if (!procAnterior && procActual) {
-    registrarEvento(`P${procActual.id} ingresa a la CPU.`);
-  } else if (snapshot.estado === "completed" && procAnterior) {
-    registrarEvento(`Simulación completada. Todos los procesos terminados.`);
-  }
+  registrarTransiciones(snapshot, listas);
+  renderizarDiagrama(snapshot, listas);
+  renderizarTablaProcesos(listas);
 
-  // Renderizar Diagrama y Tablas
-  renderizarDiagrama(snapshot);
-  renderizarTablas(snapshot);
-
-  // Actualizar estados de botones de control
   const isRunning = snapshot.estado === "running";
   const isPaused = snapshot.estado === "paused";
   const isCompleted = snapshot.estado === "completed";
-
-  elementos.btnInterrupt.disabled = !isRunning || !procActual;
-  elementos.btnError.disabled = !isRunning || !procActual;
+  const hayCpu = Boolean(snapshot.en_ejecucion);
+  elementos.btnInterrupt.disabled = !isRunning || !hayCpu;
+  elementos.btnError.disabled = !isRunning || !hayCpu;
   elementos.btnPause.disabled = !isRunning;
   elementos.btnContinue.disabled = !isPaused;
 
   if (elementos.estadoControles) {
-    if (isCompleted) {
-      elementos.estadoControles.textContent = "Simulación finalizada. Genera una nueva.";
-    } else if (isPaused) {
-      elementos.estadoControles.textContent = "Simulación pausada. Pulsa C para continuar.";
-    } else if (isRunning) {
-      elementos.estadoControles.textContent = "Usa I, E, P o C para interactuar con la CPU.";
-    } else {
-      elementos.estadoControles.textContent = "Inicia una simulación para habilitar los controles.";
-    }
+    if (isCompleted) elementos.estadoControles.textContent = "Simulación finalizada. El resumen queda disponible.";
+    else if (isPaused) elementos.estadoControles.textContent = "Simulación pausada. Pulsa C para reanudar.";
+    else if (isRunning && !hayCpu && listas.bloqueados.length) elementos.estadoControles.textContent = "CPU libre; el reloj atiende los bloqueos. P también pausa esta espera.";
+    else if (isRunning) elementos.estadoControles.textContent = "Usa I para bloqueo por E/S, E para error, P para pausar y C para continuar.";
+    else elementos.estadoControles.textContent = "Inicia una simulación para habilitar los controles.";
   }
-
   actualizarBotonesInicio();
 }
 
@@ -375,11 +325,11 @@ function limpiarSimulacion() {
   detenerConsultas();
   sessionStorage.removeItem("simulacion_id");
   simulacionId = null;
-  procesoCpuAnterior = null;
+  estadosAnteriores = new Map();
+  estadoSimulacionAnterior = null;
   renderizar({
-    estado: "sin iniciar", reloj: 0, lote_actual: null,
-    lotes_pendientes: 0, total_trabajos: 0,
-    en_ejecucion: null, en_espera: [], terminados: []
+    estado: "sin iniciar", reloj: 0, total_trabajos: 0,
+    nuevos: [], en_espera: [], en_ejecucion: null, bloqueados: [], terminados: [], memoria_ocupada: 0
   });
   snapshotActual = null;
 }
@@ -450,7 +400,9 @@ async function iniciarSimulacion() {
     simulacionId = datos.simulacion_id;
     sessionStorage.setItem("simulacion_id", simulacionId);
 
-    procesoCpuAnterior = null;
+    snapshotActual = null;
+    estadosAnteriores = new Map();
+    estadoSimulacionAnterior = null;
     historialLog = [];
     registrarEvento(`Simulación iniciada con ${cantidad} trabajos iniciales.`);
 
@@ -466,6 +418,13 @@ async function ejecutarAccion(accion) {
     mostrarMensaje("Primero inicia una simulación.");
     return;
   }
+  if ((accion === "interrupt" || accion === "error") &&
+      (snapshotActual.estado !== "running" || !snapshotActual.en_ejecucion)) {
+    mostrarMensaje("Esta acción requiere un proceso en la CPU.");
+    return;
+  }
+  if (accion === "pause" && snapshotActual.estado !== "running") return;
+  if (accion === "continue" && snapshotActual.estado !== "paused") return;
 
   // Feedback visual en el botón de la acción
   const btn = document.querySelector(`.btn-ctrl[data-action="${accion}"]`);
@@ -475,25 +434,32 @@ async function ejecutarAccion(accion) {
   }
 
   const descripcionesAccion = {
-    interrupt: `Acción I: Interrupción por E/S solicitada.`,
-    error: `Acción E: Proceso cancelado por error.`,
+    error: `Acción E: proceso terminado por error.`,
     pause: `Acción P: Simulación pausada.`,
     continue: `Acción C: Simulación reanudada.`
   };
 
   await ejecutarExclusivo(async () => {
     if (!simulacionId || !snapshotActual) return;
-    const datos = await solicitar(
-      `/simulations/${encodeURIComponent(simulacionId)}/actions`,
-      {
-        method: "POST",
-        body: JSON.stringify({ accion })
+    let datos;
+    try {
+      datos = await solicitar(
+        `/simulations/${encodeURIComponent(simulacionId)}/actions`,
+        {
+          method: "POST",
+          body: JSON.stringify({ accion })
+        }
+      );
+    } catch (error) {
+      if (error.status === 409 && simulacionId) {
+        renderizar(await solicitar(`/simulations/${encodeURIComponent(simulacionId)}`));
       }
-    );
+      throw error;
+    }
 
     renderizar(datos);
-    registrarEvento(descripcionesAccion[accion] || `Acción ejecutada: ${accion}`);
-    mostrarMensaje(`Acción: ${accion}`);
+    if (descripcionesAccion[accion]) registrarEvento(descripcionesAccion[accion]);
+    mostrarMensaje(descripcionesAccion[accion] || `Acción: ${accion}`);
   });
 
   programarConsulta();
@@ -588,15 +554,22 @@ async function recuperarSimulacion() {
     mostrarMensaje("Se recuperó la simulación anterior.");
     programarConsulta();
   } catch (error) {
-    sessionStorage.removeItem("simulacion_id");
-    simulacionId = null;
     mostrarMensaje(`No se pudo recuperar la simulación: ${mostrarError(error)}`);
+    // Conservar el ID ante fallos de red; 404 ya limpia el estado en solicitar.
+    programarConsulta();
   }
 }
 
 async function iniciarFrontend() {
   await comprobarApi();
-  await recuperarSimulacion();
+  if (simulacionId) {
+    await recuperarSimulacion();
+  } else {
+    renderizar({
+      estado: "sin iniciar", reloj: 0, total_trabajos: 0,
+      nuevos: [], en_espera: [], en_ejecucion: null, bloqueados: [], terminados: [], memoria_ocupada: 0
+    });
+  }
 }
 
 iniciarFrontend();

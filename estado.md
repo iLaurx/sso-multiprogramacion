@@ -4,30 +4,25 @@
 
 ## Situación actual
 
-**Motor y API/servicio FCFS de actividad 6 comprobados en las pruebas descritas abajo. Sigue frontend.** Rama comprobada: `feature/fcfs`. Esta revisión comenzó con cambios locales de la integración anterior y los conservó. Sin commit, push ni despliegue.
+**Actividad 6: motor, API y frontend FCFS integrados y comprobados localmente.** Integración para revisión en `codex/integracion-fcfs-frontend`, creada desde `origin/feature/fcfs` (`1e63119`) y fusionada mediante merge con `origin/feature/i3-interfaz` (`5d8012c`). Referencias actualizadas con fetch antes de comparar; las ramas locales coincidían con las remotas. Base común: `ccfec11`.
 
-- Motor: no se modificó `simulation/`; no se encontró un fallo que requiriera corregirlo.
-- API: conserva las rutas, validaciones y acciones existentes. Devuelve el snapshot completo agregando únicamente `simulacion_id`, con orden y null intactos. GET no llama tick.
-- Servicio (`backend/service.py`): conserva reloj y lock por simulación. Termina la tarea automática al completar el último tick y rechaza acciones desconocidas en llamadas internas con ValueError (HTTP sigue devolviendo 422 por validación).
-- Ejemplos: `docs/contrato-api.json` y `docs/fixtures/motor-inicial.json` reemplazados por salidas reales FCFS con cuatro procesos y seed 123. UUID HTTP generado realmente y variable; reproducción comprobada excluyendo solo ese ID.
-- Documentación actualizada: `docs/contrato-api.md`, `docs/entrega-motor.md`, `docs/cambios-backend-fcfs.md`, `README.md`, `AGENTS.md` y este estado. Las revisiones anteriores de la guía del motor son evidencia histórica; este archivo contiene la situación vigente.
+- `feature/fcfs` aporta siete commits: reglas/documentación, modelo, colas, memoria, bloqueo, tiempos y snapshot, revisión del motor y API/servicio, ejemplos y pruebas FCFS.
+- `feature/i3-interfaz` aporta un commit con cambios en los tres archivos de frontend: diseño de cinco estados, métricas, controles, tabla de tiempos, historial y visualización Three.js. Se conserva ese trabajo y su estilo.
+- No hubo conflictos textuales de Git. Se revisaron también los tres archivos fusionados automáticamente y se resolvieron incompatibilidades de contenido: `en_espera` para listos, `ejecutado` para servicio, `bloqueo_transcurrido`/`bloqueo_restante` para el bloqueo actual y `bloqueado` para el acumulado. Retirada la detección incorrecta del contrato y los mensajes/fallbacks de lotes.
+- Se conservan orden de listas/terminados, null y cero; no se calculan tiempos en pantalla. La tabla final toma todos los tiempos del servidor. Memoria viene de `memoria_ocupada`, máximo tres; CPU libre con bloqueados mantiene consultas y P/C, I/E quedan deshabilitados. Solo `completed` cierra las consultas.
+- Se conservan API y componentes existentes. Ante 409 se consulta el estado real; ante fallo de red en recuperación se conserva el ID y se reintenta; 404 limpia la simulación y permite crear otra. Pausa con CPU libre muestra que la simulación está detenida. La tabla tiene desplazamiento horizontal interno en móvil.
+- Archivos propios de esta integración: `frontend/app.js`, `frontend/index.html`, `frontend/visualizacion.js`, `tests/browser_fcfs.py`, `README.md` y este estado. `simulation/`, `backend/`, contratos y pruebas previas permanecen idénticos a FCFS. Sin funciones de actividad 8.
 
 ## Comprobaciones
 
-En esta revisión solo se editaron documentos. Se contrastaron rutas, esquemas, servicio y pruebas. Se añadió [la guía de frontend](docs/guia-frontend-fcfs.md), con rutas, controles, campos, tiempos, errores y cuatro respuestas HTTP completas capturadas con TestClient y comparadas contra el motor real. Se actualizaron contrato y entrega para distinguir lo comprobado de los pendientes visuales.
+- Suite completa: **105 aprobadas**, ejecutando `.\.venv\Scripts\python.exe -m pytest -q`. Persiste un aviso de deprecación Starlette/HTTPX; sin fallos.
+- Sintaxis de ambos JavaScript: `node --check` aprobada. `git diff --check`: sin errores.
+- Dos recorridos en Chrome sin interfaz visible, contra Uvicorn local en puerto 8766 con su reloj automático real, sin endpoint de tick ni sustitución del motor: creación de cuatro procesos, nuevos y tres residentes, I/E/P/C por teclado, tres bloqueados y CPU libre, pausa que congela reloj/bloqueos, continuación y desbloqueo tras 10 segundos simulados, error con servicio real y admisión de nuevo, terminación normal y tabla final comparada celda por celda con la respuesta HTTP. El segundo recorrido terminó en orden **2, 3, 4, 1**, conservado en la tabla. Sin errores JavaScript.
+- Se comprobaron recarga en pausa y al terminar, conflicto HTTP 409 real provocado desde otro cliente, recuperación tras interrupción de red y 404 de ID inexistente. Comprobación adicional de móvil a 390 px sin desbordamiento del documento y Three.js cargado. Capturas de escritorio, CPU libre pausada y móvil revisadas.
+- Recorrido reproducible: `tests/browser_fcfs.py`, requiere servidor local iniciado y Playwright con Chrome local o Chromium. Playwright se instaló solo en `.venv`; no se añadió a dependencias del servidor. Evidencia local ignorada por Git en `tmp/fcfs-browser/`: capturas y `resultado.json` con el snapshot final real.
 
-`tests/test_api_fcfs.py` agrega recorridos HTTP completos contrastados contra el motor, tiempos conocidos, memoria/admisión normal y por error, orden de colas, null/cero, tres bloqueados, CPU libre, límite exacto de 10 segundos, pausa con CPU y con todos bloqueados, controles rechazados sin cambios, consultas repetidas, finalización, aislamiento/concurrencia y copias independientes. También comprueba la tarea automática con pulsos controlados de su espera y reproducción de ambos JSON.
+## Entrega y límites
 
-- API/servicio: 23 pruebas aprobadas al repetir `.\.venv\Scripts\python.exe -m pytest -q tests/test_api.py tests/test_service.py tests/test_api_fcfs.py`.
-- Suite completa: **105 aprobadas** con `.\.venv\Scripts\python.exe -m pytest -q`.
-- `git diff --check`: sin errores.
-- Avisos existentes: deprecación Starlette/HTTPX y permisos de caché pytest; no fallos de pruebas.
-- No se verificó el recorrido de navegador con reloj real ni la interfaz FCFS. No se modificó frontend.
+Se deja un commit de merge en la rama nueva para revisión. Sin push, despliegue ni fusiones hacia main o feature/fcfs. El PDF local ajeno `output/pdf/Actividad_8_cambios_y_equipos.pdf` y `tmp/pdfs/` se conservaron y no se incorporaron al commit (tmp queda ignorado por las reglas existentes de FCFS).
 
-## Para el compañero de frontend
-
-Empezar por [guia-frontend-fcfs.md](docs/guia-frontend-fcfs.md), que incluye las respuestas completas y sus secuencias de reproducción.
-
-Usar [contrato-api.md](docs/contrato-api.md) y sus ejemplos FCFS. Se mantienen rutas y acciones interrupt/error/pause/continue. `en_espera` es listos en orden FCFS; mostrar nuevos desde `nuevos.length`, memoria desde `memoria_ocupada` (máximo 3) y bloqueos actuales desde `bloqueo_transcurrido`/`bloqueo_restante`. `bloqueado` es acumulado, `ejecutado` es servicio y error se presenta como ERROR aunque resultado sea null.
-
-CPU null con running y bloqueados es válido: continuar consultando hasta completed. Tomar todos los tiempos del servidor y distinguir null de cero. No usar lote/lote_actual/lotes_pendientes ni recalcular tiempos. Falta adaptar paneles, controles I/E/P/C y tabla final, y comprobar visualmente nuevos, bloqueo, CPU libre, pausa, error, final normal y recarga. Solo actividad 6; nada de actividad 8.
+No se comprobó el despliegue remoto ni un teléfono físico; las comprobaciones visuales fueron Chrome local y viewport móvil. Las simulaciones siguen en memoria: se recuperan al recargar la página mientras viva el servidor, no después de reiniciarlo. Las guías de entrega conservan la evidencia histórica de sus etapas; este archivo es el estado vigente. Pendiente: revisión del equipo antes de autorizar publicación o fusión a otras ramas.
