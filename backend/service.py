@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from typing import Dict
-from simulation import SimulationEngine, SimulationStateError
+from simulation import SimulationEngine
 
 class RegistroSimulacion:
     def __init__(self, motor: SimulationEngine, lock: asyncio.Lock, task: asyncio.Task | None = None):
@@ -24,6 +24,8 @@ class SimulationService:
                 if registro.motor.status == "completed":
                     break
                 registro.motor.tick()
+                if registro.motor.status == "completed":
+                    break
 
     async def create(self, numero_trabajos: int, seed: int | None = None) -> dict:
         motor = SimulationEngine.create(numero_trabajos=numero_trabajos, seed=seed)
@@ -61,6 +63,8 @@ class SimulationService:
                 registro.motor.pause()
             elif accion == "continue":
                 registro.motor.resume()
+            else:
+                raise ValueError("Acción no válida")
             
             return {"simulacion_id": simulacion_id, **registro.motor.snapshot()}
 

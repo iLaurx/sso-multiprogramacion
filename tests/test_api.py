@@ -75,7 +75,8 @@ def test_acciones_y_estados():
         assert respuesta.status_code == 200
         estado = respuesta.json()
         assert estado["en_ejecucion"]["id"] == 2
-        assert [p["id"] for p in estado["en_espera"]] == [3, 1]
+        assert [p["id"] for p in estado["en_espera"]] == [3]
+        assert [p["id"] for p in estado["bloqueados"]] == [1]
         assert estado["reloj"] == 0
 
         respuesta = client.post(ruta, json={"accion": "error"})
@@ -88,15 +89,16 @@ def test_acciones_y_estados():
         assert terminado["restante"] == 0
         assert estado["reloj"] == 0
 
-        # Terminar los dos procesos restantes mediante E.
-        for _ in range(2):
-            assert client.post(
-                ruta, json={"accion": "error"}
-            ).status_code == 200
+        # El ID 1 sigue bloqueado: terminar el ID 3 no cierra la simulacion.
+        respuesta = client.post(ruta, json={"accion": "error"})
+        assert respuesta.status_code == 200
+        assert respuesta.json()["estado"] == "running"
+        assert respuesta.json()["en_ejecucion"] is None
+        for accion in ("interrupt", "error"):
+            assert client.post(ruta, json={"accion": accion}).status_code == 409
+        assert client.post(ruta, json={"accion": "pause"}).status_code == 200
+        assert client.post(ruta, json={"accion": "continue"}).status_code == 200
 
-        for accion in ("interrupt", "error", "pause", "continue"):
-            respuesta = client.post(ruta, json={"accion": accion})
-            assert respuesta.status_code == 409
 
 
 def test_rechaza_accion_desconocida():
