@@ -9,6 +9,7 @@ const elementos = {
   numeroTrabajos: document.querySelector("#numeroTrabajos"),
   btnIniciar: document.querySelector("#btnIniciar"),
   btnIniciarEmulacion: document.querySelector("#btnIniciarEmulacion"),
+  btnAddProcess: document.querySelector("#btnAddProcess"),
   mensaje: document.querySelector("#mensaje"),
   reloj: document.querySelector("#reloj"),
   memoriaOcupada: document.querySelector("#memoriaOcupada"),
@@ -281,7 +282,7 @@ function registrarTransiciones(snapshot, listas) {
     if (!antes && (ahora === "ready" || ahora === "running")) registrarEvento(`${id} entra a memoria.`);
     else if (antes === "new" && ahora === "ready") registrarEvento(`${id} entra a memoria y pasa a listos.`);
     else if (antes === "ready" && ahora === "running") registrarEvento(`${id} toma la CPU.`);
-    else if (antes === "running" && ahora === "blocked") registrarEvento(`${id} se bloquea por E/S durante 10 segundos simulados.`);
+    else if (antes === "running" && ahora === "blocked") registrarEvento(`${id} se bloquea por E/S durante 9 segundos simulados.`);
     else if (antes === "blocked" && ahora === "ready") registrarEvento(`${id} termina E/S y regresa al final de listos.`);
     else if (antes === "blocked" && ahora === "running") registrarEvento(`${id} termina E/S, regresa a listos y toma la CPU.`);
     else if (ahora === "finished" && antes !== "finished") {
@@ -311,7 +312,7 @@ function renderizar(snapshot) {
   if (elementos.metricTerminados) elementos.metricTerminados.textContent = listas.terminados.length;
   if (elementos.estadoSimulacion) elementos.estadoSimulacion.textContent = snapshot.estado;
   if (elementos.ayudaInterrupcion) {
-    elementos.ayudaInterrupcion.textContent = "I: bloquea el proceso actual durante 10 segundos simulados por E/S. E: termina el proceso con ERROR.";
+    elementos.ayudaInterrupcion.textContent = "N: agrega un proceso · E: bloquea por E/S (9 s) · W: termina con ERROR · B: pausa · C: continúa.";
   }
 
   registrarTransiciones(snapshot, listas);
@@ -321,13 +322,15 @@ function renderizar(snapshot) {
   const isRunning = snapshot.estado === "running";
   const isPaused = snapshot.estado === "paused";
   const isCompleted = snapshot.estado === "completed";
+  const panelResumen = document.querySelector("#panelResumen");
+  if (panelResumen) panelResumen.hidden = !(isPaused || isCompleted);
   const hayCpu = Boolean(snapshot.en_ejecucion);
 
   if (elementos.estadoControles) {
     if (isCompleted) elementos.estadoControles.textContent = "Simulación finalizada. El resumen queda disponible.";
-    else if (isPaused) elementos.estadoControles.textContent = "Simulación pausada. Pulsa C para reanudar.";
-    else if (isRunning && !hayCpu && listas.bloqueados.length) elementos.estadoControles.textContent = "CPU libre; el reloj atiende los bloqueos. P también pausa esta espera.";
-    else if (isRunning) elementos.estadoControles.textContent = "Usa I para bloqueo por E/S, E para error, P para pausar y C para continuar.";
+    else if (isPaused) elementos.estadoControles.textContent = "Simulación pausada. Tabla completa disponible; pulsa C para continuar.";
+    else if (isRunning && !hayCpu && listas.bloqueados.length) elementos.estadoControles.textContent = "CPU libre; el reloj atiende los bloqueos. Pulsa B para pausar y revisar la tabla.";
+    else if (isRunning) elementos.estadoControles.textContent = "N agrega un proceso · E bloquea por E/S · W termina con error · B pausa · C continúa.";
     else elementos.estadoControles.textContent = "Inicia una simulación para habilitar los controles.";
   }
   actualizarControles();
@@ -385,6 +388,7 @@ function actualizarControles() {
   elementos.btnError.disabled = elementos.btnInterrupt.disabled;
   elementos.btnPause.disabled = ocupado || !running;
   elementos.btnContinue.disabled = ocupado || !paused;
+  if (elementos.btnAddProcess) elementos.btnAddProcess.disabled = ocupado || !running;
 }
 
 function ejecutarExclusivo(trabajo) {
@@ -451,6 +455,10 @@ async function ejecutarAccion(accion) {
     mostrarMensaje("Esta acción requiere un proceso en la CPU.");
     return;
   }
+  if (accion === "add_process" && snapshotActual.estado !== "running") {
+    mostrarMensaje("Solo puedes agregar procesos durante la ejecución.");
+    return;
+  }
   if (accion === "pause" && snapshotActual.estado !== "running") return;
   if (accion === "continue" && snapshotActual.estado !== "paused") return;
 
@@ -462,8 +470,10 @@ async function ejecutarAccion(accion) {
   }
 
   const descripcionesAccion = {
+    add_process: "Nuevo proceso agregado.",
+    interrupt: "Proceso bloqueado por E/S durante 9 segundos simulados.",
     error: `Acción E: proceso terminado por error.`,
-    pause: `Acción P: Simulación pausada.`,
+    pause: `Acción B: Simulación pausada.`,
     continue: `Acción C: Simulación reanudada.`
   };
 
@@ -521,7 +531,7 @@ document.addEventListener("keydown", event => {
 
   const tecla = event.key.toLowerCase();
 
-  // Barra Espaciadora: Alternar Pausa / Continuar
+  // Barra Espaciadora: alternar pausa / continuar.
   if (event.code === "Space" || event.key === " ") {
     event.preventDefault();
     if (snapshotActual?.estado === "running") {
@@ -533,9 +543,10 @@ document.addEventListener("keydown", event => {
   }
 
   const acciones = {
-    i: "interrupt",
-    e: "error",
-    p: "pause",
+    n: "add_process",
+    e: "interrupt",
+    w: "error",
+    b: "pause",
     c: "continue"
   };
 
