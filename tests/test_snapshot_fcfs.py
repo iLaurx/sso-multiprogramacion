@@ -11,12 +11,12 @@ def test_public_snapshot_blocking_pause_and_repeated_block(known_engine):
     process = engine._current
     engine.tick()
     engine.interrupt()
-    assert engine.snapshot()["bloqueados"][0]["bloqueo_restante"] == 10
-    for _ in range(9):
+    assert engine.snapshot()["bloqueados"][0]["bloqueo_restante"] == 9
+    for _ in range(8):
         engine.tick()
     state = engine.snapshot()
     blocked = state["bloqueados"][0]
-    assert (blocked["bloqueado"], blocked["bloqueo_transcurrido"], blocked["bloqueo_restante"]) == (9, 9, 1)
+    assert (blocked["bloqueado"], blocked["bloqueo_transcurrido"], blocked["bloqueo_restante"]) == (8, 8, 1)
     engine.pause()
     frozen = engine.snapshot()
     internal = asdict(process)
@@ -28,11 +28,11 @@ def test_public_snapshot_blocking_pause_and_repeated_block(known_engine):
     engine.tick()
     engine.interrupt()
     state = engine.snapshot()
-    assert state["bloqueados"][0]["bloqueado"] == 10
+    assert state["bloqueados"][0]["bloqueado"] == 9
     assert state["bloqueados"][0]["bloqueo_transcurrido"] == 0
-    assert state["bloqueados"][0]["bloqueo_restante"] == 10
+    assert state["bloqueados"][0]["bloqueo_restante"] == 9
     state["bloqueados"][0]["bloqueado"] = 999
-    assert engine.snapshot()["bloqueados"][0]["bloqueado"] == 10
+    assert engine.snapshot()["bloqueados"][0]["bloqueado"] == 9
     assert json.loads(json.dumps(engine.snapshot())) == engine.snapshot()
 
 

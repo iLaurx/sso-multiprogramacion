@@ -58,8 +58,8 @@ def check_state(state, count):
                 assert p["resultado"] is None
         if p["estado"] == "blocked":
             assert p["bloqueo_transcurrido"] == state["reloj"] - p["inicio_bloqueo"]
-            assert 0 <= p["bloqueo_transcurrido"] < 10
-            assert p["bloqueo_restante"] == 10 - p["bloqueo_transcurrido"]
+            assert 0 <= p["bloqueo_transcurrido"] < 9
+            assert p["bloqueo_restante"] == 9 - p["bloqueo_transcurrido"]
         else:
             assert p["inicio_bloqueo"] is None
 

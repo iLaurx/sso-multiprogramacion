@@ -1,8 +1,9 @@
 """Transiciones del motor. El servicio externo decide cuándo llamar tick()."""
 
 from collections import deque
+from random import Random
 
-from .generator import generate_processes
+from .generator import generate_process, generate_processes
 from .models import Process, SimulationStatus, calculate
 
 
@@ -16,10 +17,16 @@ class SimulationStateError(RuntimeError):
 # ? Cada instancia conserva su propio reloj, colas y estado, independiente de las demás.
 # ! No espera segundos reales ni controla concurrencia: esas tareas pertenecen al servicio.
 class SimulationEngine:
+    BLOCK_DURATION = 9
+
     # * Genera los trabajos, admite hasta tres en memoria y despacha el primer proceso en tiempo cero.
     # ? Recibe cantidad y semilla; la validación de ambas se delega al generador.
     def __init__(self, numero_trabajos: int, seed: int | None = None):
-        processes = generate_processes(numero_trabajos, seed)
+        if seed is not None and type(seed) is not int:
+            raise ValueError("La semilla debe ser un entero o None")
+        self._rng = Random(seed)
+        processes = generate_processes(numero_trabajos, seed, rng=self._rng)
+        self._next_id = numero_trabajos + 1
         self.total_trabajos = numero_trabajos
         self.clock = 0
         self.status: SimulationStatus = "running"
@@ -44,6 +51,18 @@ class SimulationEngine:
     def memoria_ocupada(self) -> int:
         """Los bloqueados conservan su espacio aunque no usen CPU."""
         return len(self._queue) + len(self._blocked) + int(self._current is not None)
+
+    def add_process(self) -> dict:
+        """Genera un proceso en running, admite si cabe y devuelve una copia de sus datos."""
+        if self.status != "running":
+            raise SimulationStateError("Solo se pueden agregar procesos durante la ejecución")
+        process = generate_process(self._next_id, self._rng)
+        process.estado = "new"
+        self._new.append(process)
+        self._next_id += 1
+        self.total_trabajos += 1
+        self._dispatch()
+        return process.snapshot()
 
     def _admit(self) -> None:
         """Admite nuevos al final de listos, sin superar tres residentes."""
@@ -98,7 +117,7 @@ class SimulationEngine:
                 self._current = None
         for blocked in self._blocked[:]:
             blocked.bloqueado += 1
-            if self.clock - blocked.inicio_bloqueo >= 10:
+            if self.clock - blocked.inicio_bloqueo >= self.BLOCK_DURATION:
                 self._blocked.remove(blocked)
                 blocked.inicio_bloqueo = None
                 blocked.estado = "ready"
@@ -107,7 +126,7 @@ class SimulationEngine:
         # antes del nuevo admitido, siempre detrás de los listos existentes.
         self._dispatch()
 
-    # * Aplica I: bloquea durante 10 segundos simulados sin liberar memoria.
+    # * Bloquea durante 9 segundos simulados sin liberar memoria (E en actividad 8).
     # ? Conserva el servicio y no avanza el reloj al aplicar la acción.
     def interrupt(self) -> None:
         process = self._require_running()
@@ -117,7 +136,7 @@ class SimulationEngine:
         self._current = None
         self._dispatch()
 
-    # * Aplica E: guarda el actual como error y permite que siga el próximo proceso.
+    # * Guarda el actual como error (W en actividad 8) y permite que siga el próximo.
     # ? El resultado queda en None; la interfaz identifica ERROR por el campo estado.
     # ! No completa artificialmente el TME ni agrega segundos al reloj.
     def fail(self) -> None:
@@ -157,7 +176,7 @@ class SimulationEngine:
                 {
                     **process.snapshot(),
                     "bloqueo_transcurrido": self.clock - process.inicio_bloqueo,
-                    "bloqueo_restante": 10 - (self.clock - process.inicio_bloqueo),
+                    "bloqueo_restante": self.BLOCK_DURATION - (self.clock - process.inicio_bloqueo),
                 }
                 for process in self._blocked
             ],
@@ -167,3 +186,11 @@ class SimulationEngine:
             "en_espera": [process.snapshot() for process in self._queue],
             "terminados": [process.snapshot() for process in self._finished],
         }
+
+    def processes_snapshot(self) -> list[dict]:
+        """Consulta todos los procesos por ID, con tiempos y bloqueo restante; sin pausar."""
+        state = self.snapshot()
+        processes = state["nuevos"] + state["en_espera"] + state["bloqueados"] + state["terminados"]
+        if state["en_ejecucion"] is not None:
+            processes.append(state["en_ejecucion"])
+        return sorted(processes, key=lambda process: process["id"])

@@ -14,6 +14,6 @@ def known_engine(monkeypatch):
         processes = [Process(i, (i - 1) // 3 + 1, "+", 8, 3, 7) for i in range(1, count + 1)]
         # ? La lambda devuelve los trabajos conocidos e ignora cantidad y semilla recibidas.
         # ! monkeypatch sustituye el generador solo durante la prueba y luego lo restaura.
-        monkeypatch.setattr("simulation.engine.generate_processes", lambda n, seed: processes)
+        monkeypatch.setattr("simulation.engine.generate_processes", lambda n, seed, **kwargs: processes)
         return SimulationEngine.create(count)
     return build

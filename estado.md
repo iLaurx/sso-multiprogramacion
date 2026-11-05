@@ -2,37 +2,60 @@
 
 Última actualización: 4 de noviembre de 2026.
 
-## Situación actual
+## Actividad 8: motor listo para integrar
 
-CPU 2D: se añadió una barra de avance con transición suave entre las actualizaciones del servidor y texto de segundos restantes/ejecutados. Cambios en `frontend/app.js` y `frontend/index.html`. La tarjeta se conserva mientras siga el mismo proceso para animar el avance; al cambiar de proceso se muestra su propio servicio acumulado. No hay reloj adicional: se usan `ejecutado`, `tme` y `restante`. Incluye atributos accesibles y respeta la preferencia de movimiento reducido. `node --check frontend/app.js` y `git diff --check` aprobados; no se ejecutó la suite ni se verificó en navegador en este paso. Contrato de API y motor intactos.
+Autorización de esta tarea: se reemplazó el límite anterior a actividad 6 solo
+para adaptar el motor. Rama comprobada: `feature/fcfs-procesos-dinamicos`.
+Se leyó la consigna original `C:/Users/ele/Downloads/Actividad 8 SSO.pdf`.
 
-Preferencia visual aplicada: se retiró la vista 3D. `frontend/index.html` conserva las cinco columnas y tarjetas 2D de FCFS, sin panel, estilos ni scripts de Three.js; se eliminó `frontend/visualizacion.js` y su llamada desde `frontend/app.js`. Se respetaron los cambios locales previos. No cambian la API, los controles ni los tiempos. Sintaxis de `app.js` y `git diff --check` aprobados; búsqueda sin referencias restantes al visor en frontend. La suite pytest y la captura con Playwright se intentaron en esta revisión, pero no devolvieron resultados y se interrumpieron; no se acredita una nueva comprobación de navegador ni de la suite para este cambio.
-
-**Actividad 6: motor, API y frontend FCFS integrados y comprobados localmente.** Rama actual: `codex/integracion-fcfs-frontend`. Al iniciar esta revisión la adaptación visual y el merge de integración ya existían; el único elemento local sin seguimiento era `output/`, que se conserva intacto.
-
-La pantalla conserva el diseño y componentes existentes: creación de todos los procesos al inicio, cinco estados, orden FCFS, nuevos, memoria de tres residentes, reloj del servidor, CPU, bloqueo actual de 10 segundos y tabla de tiempos/resultados. `ERROR` depende del estado; servicio usa `ejecutado`. Se distinguen null y cero y solo `completed` detiene las consultas. No quedan referencias a campos de lotes en `frontend/`.
-
-En este paso se modificaron:
-
-- `frontend/app.js`: reserva inmediata de la petición para impedir creaciones y acciones duplicadas por pulsaciones rápidas; controles deshabilitados mientras hay una petición; un único punto para reprogramar consultas también después de errores; recuperación inicial protegida antes de permitir crear otra simulación. Los atajos ignoran campos de entrada, contenido editable y composición de texto. La comprobación de disponibilidad también valida el estado HTTP.
-- `tests/browser_fcfs.py`: recorrido ampliado con latencia, creación/acciones simultáneas, atajos durante edición, recuperación lenta, error HTTP 422 y continuidad de consultas. También verifica regreso de bloqueados a listos y servicio positivo conservado al terminar por error.
-- `estado.md`: situación y comprobaciones de esta revisión.
-
-No cambió el contrato de datos ni los métodos para API/frontend. `simulation/`, `backend/`, tecnologías y diseño se conservaron. Solo actividad 6, sin creación durante ejecución ni controles de actividad 8.
+- `simulation/engine.py`: `add_process()` genera un proceso en running con ID
+  único, actualiza el total, respeta nuevos FIFO y tres residentes. Bloqueo y
+  restante cambian a 9 segundos. `processes_snapshot()` consulta todos los
+  procesos por ID, con tiempos y copias independientes. El cierre incluye todas
+  las altas; no se reabre completed y se rechazan altas en pausa.
+- `simulation/generator.py`: generación individual compartida con la inicial y
+  azar privado por simulación; conserva rangos válidos y semilla reproducible.
+- Pruebas del motor: actualizadas `tests/test_engine.py`, `tests/test_times.py`,
+  `tests/test_snapshot_fcfs.py`, `tests/test_fcfs_handoff.py` y fixture en
+  `tests/conftest.py`; añadida `tests/test_dynamic_processes.py`.
+- Documentación: contrato vigente en `docs/motor-actividad-8.md`; ejemplos
+  reproducibles de `docs/cambios-backend-fcfs.md` ajustados a 9 segundos;
+  `fcfs.md` señala el alcance autorizado y el contexto histórico de actividad 6.
 
 ## Comprobaciones
 
-- Suite completa solicitada: **105 aprobadas**, con `.\.venv\Scripts\python.exe -m pytest -q`. Un aviso de deprecación Starlette/HTTPX; sin fallos.
-- Sintaxis de `frontend/app.js` y `frontend/visualizacion.js`: `node --check` aprobada. `git diff --check`: sin errores de espacios.
-- Chrome local sin interfaz visible contra Uvicorn en `127.0.0.1:8767`, con reloj automático real y sin endpoint de tick: creación de cuatro procesos, tres residentes y nuevos, I/E/P/C, CPU libre con tres bloqueados, pausa que congela reloj/bloqueos, continuación, desbloqueo tras 10 segundos simulados, admisión de nuevos, final normal/error y comparación de todas las celdas de la tabla final con la respuesta HTTP.
-- Recarga en pausa y al finalizar, conflicto 409 provocado por otro cliente, pérdida de conexión durante recuperación con conservación del ID, reintento y 404 que permite crear otra simulación. Sin errores JavaScript.
-- Recorrido adicional con respuestas demoradas: un solo POST ante dos solicitudes de creación o acción, ninguna petición API simultánea, Enter sin creación durante ejecución, atajos ignorados en input y contenido editable, error 422 con `detail` en lista y consultas que continúan sin repetir el POST.
-- Capturas de escritorio, CPU libre pausada y viewport móvil de 390 px revisadas; sin desbordamiento horizontal del documento, con desplazamiento interno de la tabla. Evidencia local ignorada por Git en `tmp/fcfs-browser/`: capturas y `resultado.json` del motor real. El script requiere Playwright y Chrome local o Chromium, sin añadir dependencias al servidor.
+**92 pruebas del motor aprobadas** (79 existentes actualizadas y 13 nuevas):
 
-## Pendientes y límites
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests/test_engine.py tests/test_models.py tests/test_times.py tests/test_snapshot_fcfs.py tests/test_fcfs_handoff.py tests/test_dynamic_processes.py
+```
 
-Revisión puntual de las tarjetas: el HTML actual ya muestra «Memoria ocupada» con capacidad 3 y «Procesos nuevos»; `app.js` usa `memoria_ocupada` y `nuevos.length`, sin campos públicos de lotes. Sintaxis JavaScript comprobada con `node --check`. La consulta HTTP adicional con TestClient no terminó y se interrumpió; esta revisión no confirma qué versión está abierta en el navegador o publicada. No se modificó el frontend en esta comprobación.
+Se probaron 2000 altas reproducibles, datos válidos, IDs después de terminar
+procesos, memoria llena/libre, CPU libre con bloqueados, orden de nuevos, pausa,
+rechazos sin cambios, bloqueos repetidos y simultáneos, copias serializables,
+partición de tiempos y cierre con altas en secuencias mixtas. Los cuatro JSON
+actualizados de la guía coinciden con el motor real. `git diff --check` aprobado.
 
-Revisión del equipo antes de publicar o fusionar a otras ramas. No se hicieron commits, pushes, merges ni despliegues en este paso. No se comprobó el sitio remoto ni un teléfono físico. Las simulaciones se recuperan al recargar mientras siga vivo el servidor; no persisten después de reiniciarlo.
+Se intentó la suite completa con `-m pytest -q --tb=short`, pero no devolvió
+salida y se interrumpió. No se acredita una comprobación nueva de API/servicio
+ni de navegador. Sus pruebas/fixtures de actividad 6 no se modificaron.
 
-`fcfs.md` y las guías de entrega conservan descripciones de etapas anteriores que todavía señalan el frontend pendiente; el código revisado y este estado acreditan la integración local actual. El plan y el alcance no cambiaron.
+## Qué sigue para API
+
+Conectar N a `add_process()` y consultar después el snapshot. Para B, pausar y
+consultar `processes_snapshot()` bajo la misma exclusión mutua del servicio;
+C continúa. Revisar acciones, contratos, fixtures y pruebas HTTP para actividad
+8. E corresponde a `interrupt()` y W a `fail()`; el motor no interpreta teclas.
+`total_trabajos` ya es acumulado. Preservar orden, tiempos y null; CPU libre no
+significa final. Llegada sigue siendo admisión a memoria y espera solo listos.
+Para nuevos, la presentación de campos nulos del BCP no debe borrar sus datos.
+
+API, servicio y frontend no se modificaron. Su integración y verificación visual
+con actividad 8 quedan pendientes; la integración local previa de actividad 6
+no prueba las nuevas funciones. No se hizo commit, push, merge ni despliegue.
+
+## Trabajo previo conservado
+
+Se preparó `output/Texto_cambios_actividad_6.txt` para el reporte, con una explicación general del cambio de lotes a FCFS. En este paso solo se redactó el texto; no se modificó la aplicación ni se ejecutaron pruebas.
+
+Se conservaron los archivos previos de `output/` sin modificarlos.
