@@ -1,5 +1,12 @@
 # De lotes a FCFS — Actividad 6
 
+> Alcance vigente para esta tarea: por autorización explícita del usuario se
+> adapta únicamente el motor a actividad 8, con altas durante ejecución y bloqueo
+> de 9 segundos. Contrato y decisiones en [docs/motor-actividad-8.md](docs/motor-actividad-8.md).
+> API, servicio y frontend quedan pendientes para el equipo. Las reglas de
+> actividad 6 que siguen se conservan como contexto histórico y no sustituyen
+> esta autorización. El estado actual está en [estado.md](estado.md).
+
 Vamos a adaptar el simulador que ya tenemos para la actividad 6 de **Sistemas Operativos**. Seguimos trabajando en el mismo proyecto: aprovecharemos el servidor, las operaciones, la comunicación con la API y buena parte de la pantalla.
 
 Este archivo recoge las reglas y el plan de la actividad 6. **El motor FCFS ya está implementado y revisado; falta completar la integración y adaptar la pantalla.** El alcance es únicamente la actividad 6. El estado vigente está en [estado.md](estado.md), el contrato real del motor en [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md) y el trabajo por integrar en [docs/entrega-motor.md](docs/entrega-motor.md).

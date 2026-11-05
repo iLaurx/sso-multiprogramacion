@@ -1,3 +1,5 @@
+> Actividad 8: el contrato vigente de altas y consulta completa está en [motor-actividad-8.md](motor-actividad-8.md). Los ejemplos siguientes ya usan bloqueo de 9 segundos. Las notas de entrega de actividad 6 al final son históricas.
+
 # Cambios del backend a FCFS — Actividad 6
 
 Guía del motor implementado de **Sistemas Operativos**. Describe el código actual de `simulation/`, no una propuesta. Es la referencia Python para integrar FCFS; `contrato-api.md` describe su envoltura HTTP. No se modificaron API ni frontend en este paso.
@@ -20,7 +22,7 @@ Se importa con `from simulation import SimulationEngine, SimulationStateError`.
 | --- | --- |
 | `SimulationEngine.create(numero_trabajos, seed=None)` | Genera todos los procesos, admite hasta tres residentes y despacha el primero en reloj 0. Cantidad: entero positivo, sin bool; semilla: entero sin bool o None. Entrada inválida genera ValueError. |
 | `tick()` | Avanza un segundo simulado en running: servicio de CPU, espera de listos y bloqueos. Funciona con CPU libre. En paused o completed no cambia nada. Devuelve None. |
-| `interrupt()` | I: mueve la CPU a blocked durante 10 segundos simulados. Conserva servicio y memoria; despacha al siguiente listo. No avanza el reloj. |
+| `interrupt()` | I: mueve la CPU a blocked durante 9 segundos simulados. Conserva servicio y memoria; despacha al siguiente listo. No avanza el reloj. |
 | `fail()` | E: termina la CPU como error, registra finalización, conserva servicio real y resultado None. Libera memoria y admite al siguiente nuevo. No avanza el reloj. |
 | `pause()` / `resume()` | P/C: detienen todo o continúan. Repetir P en pausa o C en running es válido. En completed generan SimulationStateError. |
 | `snapshot()` | Devuelve un diccionario nuevo serializable a JSON, sin ticks ni cambios de estado. tick/I/E/P/C devuelven None: consultar después con este método. create devuelve el motor. |
@@ -34,7 +36,7 @@ I/E generan `SimulationStateError` en pausa, al finalizar o si no hay CPU activa
 | --- | --- |
 | `estado` | running, paused o completed. Se conserva. |
 | `reloj` | Entero de segundos simulados. Se conserva. |
-| `total_trabajos` | Cantidad inicial; todos se generan al crear. Se conserva. |
+| `total_trabajos` | Total acumulado: procesos iniciales más altas aceptadas con `add_process()` en actividad 8. |
 | `en_ejecucion` | Objeto de proceso o null si la CPU está libre. Se conserva. |
 | `en_espera` | Lista de listos ready en orden FCFS; ya no corresponde a un lote. |
 | `terminados` | Lista en orden de terminación, tanto finished como error. Se conserva. |
@@ -66,13 +68,13 @@ Se eliminan `lote_actual` y `lotes_pendientes`. El motor no devuelve `simulacion
 
 Se elimina `lote` del snapshot de proceso. Permanece temporalmente en el constructor y generador como dato interno sin efecto en FCFS; no debe usarse en la integración.
 
-Solo las entradas de `SimulationEngine.snapshot()['bloqueados']` añaden `bloqueo_transcurrido` y `bloqueo_restante`: reloj - inicio_bloqueo y 10 - transcurrido. Permiten mostrar el bloqueo actual sin confundirlo con `bloqueado` acumulado. Se calculan al consultar, sin modificar datos. No aparecen en el snapshot individual de Process ni en las otras colas.
+Solo las entradas de `SimulationEngine.snapshot()['bloqueados']` añaden `bloqueo_transcurrido` y `bloqueo_restante`: reloj - inicio_bloqueo y 9 - transcurrido. Permiten mostrar el bloqueo actual sin confundirlo con `bloqueado` acumulado. Se calculan al consultar, sin modificar datos. No aparecen en el snapshot individual de Process ni en las otras colas.
 
 Todos los tiempos se expresan en segundos simulados enteros. None se serializa como null; cero es un instante válido y no significa dato ausente. Para un terminado: retorno = espera + ejecutado + bloqueado. No se incluye tiempo en nuevos.
 
 ## Orden y reloj
 
-Cada tick cuenta el intervalo de quienes ya estaban en CPU, listos o bloqueados. Al cumplirse 10 segundos, el bloqueado vuelve al final de listos, sin liberar memoria. Si coincide con una finalización, se encola antes del nuevo admitido y después de los listos existentes. Los desbloqueados simultáneos respetan su orden de bloqueo. El despacho no consume tiempo: quien recibe CPU al cerrar un tick ejecuta desde el siguiente. Pausa congela todos los tiempos.
+Cada tick cuenta el intervalo de quienes ya estaban en CPU, listos o bloqueados. Al cumplirse 9 segundos, el bloqueado vuelve al final de listos, sin liberar memoria. Si coincide con una finalización, se encola antes del nuevo admitido y después de los listos existentes. Los desbloqueados simultáneos respetan su orden de bloqueo. El despacho no consume tiempo: quien recibe CPU al cerrar un tick ejecuta desde el siguiente. Pausa congela todos los tiempos.
 
 ## Ejemplos obtenidos del motor
 
@@ -213,7 +215,7 @@ motor.snapshot()
       "bloqueado": 3,
       "inicio_bloqueo": 2,
       "bloqueo_transcurrido": 3,
-      "bloqueo_restante": 7
+      "bloqueo_restante": 6
     }
   ],
   "memoria_ocupada": 1,
@@ -252,7 +254,7 @@ motor.snapshot()
       "operando_a": -77,
       "operando_b": 97,
       "tme": 7,
-      "ejecutado": 2,
+      "ejecutado": 3,
       "restante": 0,
       "resultado": null,
       "llegada": 0,
@@ -261,7 +263,7 @@ motor.snapshot()
       "retorno": 12,
       "respuesta": 0,
       "espera": 0,
-      "bloqueado": 10,
+      "bloqueado": 9,
       "inicio_bloqueo": null
     }
   ]
@@ -327,7 +329,7 @@ Resultado: **79 pruebas del motor aprobadas**. La suite completa con `-m pytest 
 
 ## Motor terminado e incompatibilidades anteriores
 
-Implementado y probado en el motor: FCFS, admisión continua, tres residentes contando bloqueados, I durante 10 segundos, E con servicio real, P/C completos, reloj con CPU libre, cierre correcto, tiempos y snapshots independientes serializables.
+Implementado y probado en el motor: FCFS, admisión continua, tres residentes contando bloqueados, I durante 9 segundos, E con servicio real, P/C completos, reloj con CPU libre, cierre correcto, tiempos y snapshots independientes serializables.
 
 El servicio actual de `backend/service.py` ya utiliza el motor y transmite su snapshot sin transformarlo, agregando `simulacion_id`. Por eso las respuestas HTTP reciben estos cambios aunque no se hayan editado API ni rutas. Sus acciones actuales son interrupt, error, pause y continue; no existe endpoint público de tick. `contrato-api.md` ya describe esas rutas existentes; no hay que volver a crearlas.
 
@@ -337,7 +339,7 @@ Pendiente: verificar la integración de API con este esquema, ampliar sus prueba
 | --- | --- |
 | Ya no hay lote, lote_actual ni lotes_pendientes | Cambio intencional de contrato FCFS; corregir consumidores anteriores. No implica que falte un lote en el motor. |
 | CPU null con running y bloqueados presentes | Estado válido. El servicio debe seguir llamando tick; no usar CPU null como condición de final. |
-| I no devuelve el proceso a listos inmediatamente | Comportamiento correcto de actividad 6: bloqueo de 10 segundos, con memoria ocupada. |
+| I no devuelve el proceso a listos inmediatamente | Comportamiento correcto de actividad 6: bloqueo de 9 segundos, con memoria ocupada. |
 | I/E sin CPU activa devuelven SimulationStateError | Rechazo esperado; las rutas actuales lo traducen a HTTP 409. No es un fallo de desbloqueo. |
 | resultado null con estado error | Contrato conservado: presentar ERROR a partir del estado. No reemplazar servicio por TME. |
 | Bloqueos simultáneos o coincidentes con finalización | Orden definido en esta guía, probado en el motor; no reordenar desde API. |

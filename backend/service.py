@@ -31,14 +31,14 @@ class SimulationService:
         motor = SimulationEngine.create(numero_trabajos=numero_trabajos, seed=seed)
         simulacion_id = str(uuid.uuid4())
         lock = asyncio.Lock()
-        
+
         task = None
         if self.auto_clock:
             task = asyncio.create_task(self._clock_task(simulacion_id))
-            
+
         registro = RegistroSimulacion(motor=motor, lock=lock, task=task)
         self.simulaciones[simulacion_id] = registro
-        
+
         async with lock:
             return {"simulacion_id": simulacion_id, **motor.snapshot()}
 
@@ -53,7 +53,7 @@ class SimulationService:
         registro = self.simulaciones.get(simulacion_id)
         if not registro:
             raise KeyError("Simulación no encontrada")
-            
+
         async with registro.lock:
             if accion == "interrupt":
                 registro.motor.interrupt()
@@ -63,9 +63,11 @@ class SimulationService:
                 registro.motor.pause()
             elif accion == "continue":
                 registro.motor.resume()
+            elif accion == "add_process":
+                registro.motor.add_process()
             else:
                 raise ValueError("Acción no válida")
-            
+
             return {"simulacion_id": simulacion_id, **registro.motor.snapshot()}
 
     async def tick_once(self, simulacion_id: str):

@@ -52,15 +52,15 @@ def test_wait_after_unblocking_and_first_attention_not_reset(known_engine):
     first, second, third = engine._current, *engine._queue
     advance(engine, 2)
     engine.interrupt()
-    advance(engine, 10)
-    assert times(first) == (0, 0, None, None, 0, 0, 2, 10)
+    advance(engine, 9)
+    assert times(first) == (0, 0, None, None, 0, 0, 2, 9)
     assert [p.id for p in engine._queue] == [1]
-    advance(engine, 4)
+    advance(engine, 5)
     assert engine._current is first
-    assert times(first) == (0, 0, None, None, 0, 4, 2, 10)
+    assert times(first) == (0, 0, None, None, 0, 5, 2, 9)
     advance(engine, 5)
     assert [times(p) for p in (first, second, third)] == [
-        (0, 0, 21, 21, 0, 4, 7, 10),
+        (0, 0, 21, 21, 0, 5, 7, 9),
         (0, 2, 9, 9, 2, 2, 7, 0),
         (0, 9, 16, 16, 9, 9, 7, 0),
     ]
@@ -71,12 +71,12 @@ def test_repeated_blocks_idle_cpu_and_error_keep_real_service(known_engine):
     process = engine._current
     advance(engine, 2)
     engine.interrupt()
-    advance(engine, 10)
+    advance(engine, 9)
     advance(engine, 1)
     engine.interrupt()
-    advance(engine, 10)
+    advance(engine, 9)
     engine.fail()
-    assert times(process) == (0, 0, 23, 23, 0, 0, 3, 20)
+    assert times(process) == (0, 0, 21, 21, 0, 0, 3, 18)
     assert process.estado == "error"
     assert process.ejecutado < process.tme
     assert process.retorno == process.espera + process.ejecutado + process.bloqueado
@@ -137,7 +137,7 @@ def test_snapshot_exposes_times_and_reads_do_not_change_them(known_engine):
             "espera", "bloqueado", "inicio_bloqueo",
         } | ({"bloqueo_transcurrido", "bloqueo_restante"} if process["estado"] == "blocked" else set())
     assert snapshot["bloqueados"][0]["bloqueo_transcurrido"] == 1
-    assert snapshot["bloqueados"][0]["bloqueo_restante"] == 9
+    assert snapshot["bloqueados"][0]["bloqueo_restante"] == 8
     for _ in range(5):
         assert engine.snapshot() == snapshot
     assert [(asdict(p), times(p)) for p in processes] == before

@@ -569,6 +569,7 @@
       grid-template-columns: 1fr;
       gap: 20px;
     }
+    .tables-row[hidden] { display: none; }
 
     .table-box {
       background: var(--bg-panel);
@@ -860,7 +861,7 @@
       </div>
 
       <div class="diagram-footer-text">
-        <span id="ayudaInterrupcion">I: bloquea el proceso actual durante 10 segundos simulados por E/S. E: termina el proceso con ERROR.</span>
+        <span id="ayudaInterrupcion">N: agrega un proceso · E: bloquea por E/S (9 s) · W: termina con ERROR · B: pausa · C: continúa.</span>
       </div>
 
       <!-- Detalle de Ejecución en Línea -->
@@ -876,16 +877,20 @@
           Iniciar emulación
         </button>
 
-        <button id="btnInterrupt" class="btn-ctrl pink-btn" data-action="interrupt" title="Bloquear proceso actual por 10 segundos simulados (E/S)" disabled>
-          <kbd>I</kbd> Bloquear por E/S
+        <button id="btnAddProcess" class="btn-ctrl cyan-btn" data-action="add_process" title="Agregar un proceso durante la ejecución" disabled>
+          <kbd>N</kbd> Nuevo proceso
+        </button>
+
+        <button id="btnInterrupt" class="btn-ctrl pink-btn" data-action="interrupt" title="Bloquear proceso actual por 9 segundos simulados (E/S)" disabled>
+          <kbd>E</kbd> Bloquear por E/S
         </button>
 
         <button id="btnError" class="btn-ctrl pink-btn" data-action="error" title="Terminar proceso actual por error" disabled>
-          <kbd>E</kbd> Error
+          <kbd>W</kbd> Error
         </button>
 
-        <button id="btnPause" class="btn-ctrl cyan-btn" data-action="pause" title="Pausar simulación" disabled>
-          <kbd>P</kbd> Pausa
+        <button id="btnPause" class="btn-ctrl cyan-btn" data-action="pause" title="Pausar simulación y mostrar la tabla" disabled>
+          <kbd>B</kbd> Pausa
         </button>
 
         <button id="btnContinue" class="btn-ctrl cyan-btn" data-action="continue" title="Continuar simulación" disabled>
@@ -903,7 +908,7 @@
     </div>
 
     <!-- Tablas en Paralelo (Imagen 2) -->
-    <section class="tables-row">
+    <section id="panelResumen" class="tables-row" hidden>
       <div class="table-box">
         <div class="table-tag cyan">RESUMEN DE PROCESOS</div>
         <h3 class="table-title">Tiempos y resultados</h3>

@@ -96,7 +96,7 @@ def test_tick_and_interrupt_preserve_time_and_queue(known_engine):
     assert [p["id"] for p in engine.snapshot()["terminados"]] == [2, 3, 1]
 
 
-# * Un único proceso deja CPU libre diez segundos y retoma el servicio conservado.
+# * Un único proceso deja CPU libre nueve segundos y retoma el servicio conservado.
 def test_interrupt_single_live_process(known_engine):
     engine = known_engine(1)
     engine.tick()
@@ -105,7 +105,7 @@ def test_interrupt_single_live_process(known_engine):
     assert engine.clock == before["reloj"]
     assert engine.snapshot()["en_ejecucion"] is None
     assert engine.status == "running"
-    for _ in range(9):
+    for _ in range(8):
         engine.tick()
         assert engine.snapshot()["en_ejecucion"] is None
         assert engine.snapshot()["bloqueados"][0]["ejecutado"] == 1
@@ -115,7 +115,7 @@ def test_interrupt_single_live_process(known_engine):
     for _ in range(6):
         engine.tick()
     assert engine.status == "completed"
-    assert engine.clock == 17
+    assert engine.clock == 16
 
 
 # * Comprueba el error tras dos ticks y la admisión inmediata del siguiente nuevo.
@@ -312,25 +312,25 @@ def test_repeated_blocking_and_pause_at_deadline(known_engine):
     engine.tick()
     engine.interrupt()
     assert process.inicio_bloqueo == 1
-    for _ in range(9):
+    for _ in range(8):
         engine.tick()
-    assert process.bloqueado == 9
+    assert process.bloqueado == 8
     engine.pause()
     before = engine.snapshot()
     for _ in range(20):
         engine.tick()
     assert engine.snapshot() == before
-    assert (process.bloqueado, process.inicio_bloqueo) == (9, 1)
+    assert (process.bloqueado, process.inicio_bloqueo) == (8, 1)
     engine.resume()
     engine.tick()
     assert engine._current is process
-    assert (process.ejecutado, process.bloqueado, process.inicio_bloqueo) == (1, 10, None)
+    assert (process.ejecutado, process.bloqueado, process.inicio_bloqueo) == (1, 9, None)
     engine.interrupt()
-    assert process.inicio_bloqueo == 11
-    for _ in range(10):
+    assert process.inicio_bloqueo == 10
+    for _ in range(9):
         engine.tick()
     assert engine._current is process
-    assert (process.ejecutado, process.bloqueado, process.inicio_bloqueo) == (1, 20, None)
+    assert (process.ejecutado, process.bloqueado, process.inicio_bloqueo) == (1, 18, None)
 
 
 def test_simultaneous_blocks_return_in_order_without_admitting_new(known_engine):
@@ -343,7 +343,7 @@ def test_simultaneous_blocks_return_in_order_without_admitting_new(known_engine)
     for action in (engine.interrupt, engine.fail):
         with pytest.raises(SimulationStateError, match="activo"):
             action()
-    for _ in range(9):
+    for _ in range(8):
         engine.tick()
         assert engine._current is None
         assert engine.status == "running"
@@ -359,16 +359,16 @@ def test_unblock_joins_tail_before_new_admission_on_same_tick(known_engine):
     engine = known_engine(5)
     blocked = engine._current
     engine.interrupt()
-    engine._current.tme = 10
-    for _ in range(9):
+    engine._current.tme = 9
+    for _ in range(8):
         engine.tick()
     assert blocked.estado == "blocked"
-    assert blocked.bloqueado == 9
+    assert blocked.bloqueado == 8
     engine.tick()
     assert engine._current.id == 3
     assert [p.id for p in engine._queue] == [1, 4]
     assert [p.id for p in engine._new] == [5]
-    assert blocked.bloqueado == 10
+    assert blocked.bloqueado == 9
     assert engine.memoria_ocupada == 3
 
 
