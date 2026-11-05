@@ -6,4 +6,4 @@ class CrearSimulacion(BaseModel):
     seed: StrictInt | None = None
 
 class AccionSimulacion(BaseModel):
-    accion: Literal["interrupt", "error", "pause", "continue"]
+    accion: Literal["interrupt", "error", "pause", "continue", "add_process"]

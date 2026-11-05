@@ -45,7 +45,7 @@ def test_http_preserves_entire_engine_snapshot_and_times(ending):
         tick(2)
         paused_cpu = action('pause', oracle.pause)
         assert tick(3) == paused_cpu
-        for name in ('interrupt', 'error'):
+        for name in ('interrupt', 'error', 'add_process'):
             assert client.post(route + '/actions', json={'accion': name}).status_code == 409
             check(paused_cpu)
         action('continue', oracle.resume)
@@ -63,12 +63,12 @@ def test_http_preserves_entire_engine_snapshot_and_times(ending):
         action('pause', oracle.pause)
         action('continue', oracle.resume)
         action('continue', oracle.resume)
-        ninth = tick(9)
-        assert [p['bloqueo_restante'] for p in ninth['bloqueados']] == [1, 1, 1]
-        tenth = tick(1)
-        assert tenth['en_ejecucion']['id'] == 1
-        assert tenth['en_ejecucion']['ejecutado'] == 2
-        assert [p['id'] for p in tenth['en_espera']] == [2, 3]
+        eighth = tick(8)
+        assert [p['bloqueo_restante'] for p in eighth['bloqueados']] == [1, 1, 1]
+        ninth = tick(1)
+        assert ninth['en_ejecucion']['id'] == 1
+        assert ninth['en_ejecucion']['ejecutado'] == 2
+        assert [p['id'] for p in ninth['en_espera']] == [2, 3]
         if ending == 'error':
             admitted = action('error', oracle.fail)
             assert admitted['terminados'][0]['ejecutado'] == 2
@@ -85,9 +85,58 @@ def test_http_preserves_entire_engine_snapshot_and_times(ending):
         for p in final['terminados']:
             assert p['retorno'] == p['espera'] + p['ejecutado'] + p['bloqueado']
         assert tick(3) == final
-        for name in ('interrupt', 'error', 'pause', 'continue'):
+        for name in ('interrupt', 'error', 'pause', 'continue', 'add_process'):
             assert client.post(route + '/actions', json={'accion': name}).status_code == 409
             check(final)
+
+
+def test_http_add_process_and_bcp_pause_consistency():
+    app = create_app(auto_clock=False)
+    oracle = SimulationEngine.create(2, seed=123)
+    with TestClient(app) as client:
+        res = client.post('/api/simulations', json={'numero_trabajos': 2, 'seed': 123})
+        assert res.status_code == 201
+        sid = res.json()['simulacion_id']
+        route = f'/api/simulations/{sid}'
+
+        # Crear con memoria disponible (< 3): entra directo a listos
+        oracle.add_process()
+        added_ready = client.post(route + '/actions', json={'accion': 'add_process'})
+        assert added_ready.status_code == 200
+        data_ready = added_ready.json()
+        assert data_ready == {'simulacion_id': sid, **oracle.snapshot()}
+        assert data_ready['memoria_ocupada'] == 3
+        assert data_ready['total_trabajos'] == 3
+        assert [p['id'] for p in data_ready['en_espera']] == [2, 3]
+        assert data_ready['nuevos'] == []
+
+        # Crear con memoria llena (== 3): queda en nuevos con campos null intactos
+        oracle.add_process()
+        added_new = client.post(route + '/actions', json={'accion': 'add_process'})
+        assert added_new.status_code == 200
+        data_new = added_new.json()
+        assert data_new == {'simulacion_id': sid, **oracle.snapshot()}
+        assert data_new['total_trabajos'] == 4
+        assert len(data_new['nuevos']) == 1
+        nuevo = data_new['nuevos'][0]
+        assert nuevo['id'] == 4
+        assert nuevo['estado'] == 'new'
+        assert nuevo['llegada'] is None
+        assert nuevo['primera_atencion'] is None
+        assert nuevo['finalizacion'] is None
+        assert nuevo['retorno'] is None
+        assert nuevo['respuesta'] is None
+
+        # Pausa consistente para abrir tabla BCP
+        oracle.pause()
+        bcp_pause = client.post(route + '/actions', json={'accion': 'pause'})
+        assert bcp_pause.status_code == 200
+        bcp_data = bcp_pause.json()
+        assert bcp_data['estado'] == 'paused'
+        assert bcp_data == client.get(route).json()
+
+        # En pausa no se permite add_process
+        assert client.post(route + '/actions', json={'accion': 'add_process'}).status_code == 409
 
 
 def test_http_known_times(known_engine):
@@ -113,12 +162,14 @@ def test_service_concurrency_isolation_and_snapshot_copies():
         async with register.lock:
             pending = [asyncio.create_task(service.tick_once(aid)),
                        asyncio.create_task(service.apply_action(aid, 'interrupt')),
+                       asyncio.create_task(service.apply_action(aid, 'add_process')),
                        asyncio.create_task(service.get_snapshot(aid))]
             await asyncio.sleep(0)
             assert all(not task.done() for task in pending)
-        _, action, snapshot = await asyncio.gather(*pending)
-        assert action == snapshot
+        _, _, action_add, snapshot = await asyncio.gather(*pending)
+        assert action_add == snapshot
         assert snapshot['reloj'] == 1
+        assert snapshot['total_trabajos'] == 5
         assert snapshot['bloqueados'][0]['ejecutado'] == 1
         await asyncio.gather(*(service.tick_once(aid) for _ in range(3)),
                              *(service.get_snapshot(aid) for _ in range(10)))
@@ -165,10 +216,10 @@ def test_automatic_clock_idle_pause_completion_and_cleanup(monkeypatch):
             await pulse()
             assert await service.get_snapshot(sid) == before
             await service.apply_action(sid, 'continue')
-            for _ in range(9):
+            for _ in range(8):
                 await pulse()
             state = await service.get_snapshot(sid)
-            assert state['reloj'] == 9 and state['en_ejecucion'] is None
+            assert state['reloj'] == 8 and state['en_ejecucion'] is None
             assert state['bloqueados'][0]['bloqueo_restante'] == 1
             await pulse()
             assert (await service.get_snapshot(sid))['en_ejecucion']['ejecutado'] == 0
@@ -176,8 +227,8 @@ def test_automatic_clock_idle_pause_completion_and_cleanup(monkeypatch):
                 await pulse()
             await asyncio.wait_for(task, 1)
             final = await service.get_snapshot(sid)
-            assert final['estado'] == 'completed' and final['reloj'] == 17
-            assert final['terminados'][0]['bloqueado'] == 10
+            assert final['estado'] == 'completed' and final['reloj'] == 16
+            assert final['terminados'][0]['bloqueado'] == 9
         finally:
             await service.close()
         assert task.done() and not service.simulaciones

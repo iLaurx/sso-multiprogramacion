@@ -308,3 +308,32 @@ HTTP 200
   ]
 }
 ```
+## Contrato API Actualizado (Procesos Dinámicos y BCP)
+
+### 1. Rutas y Acciones (`POST /api/simulations/{simulacion_id}/actions`)
+El cuerpo de la petición recibe `{"accion": "<nombre>"}` con las siguientes acciones válidas:
+- `"add_process"` (Tecla **N** en interfaz): Crea un nuevo proceso dinámicamente bajo el bloqueo del servidor y devuelve el snapshot actualizado.
+  - Si `memoria_ocupada < 3`, entra directamente a `en_espera` (o `en_ejecucion` si la CPU estaba libre) con `llegada = reloj`.
+  - Si `memoria_ocupada == 3` (memoria llena), se conserva en `nuevos` con `estado: "new"` y sus tiempos (`llegada`, `primera_atencion`, `finalizacion`, `retorno`, `respuesta`) en `null`.
+- `"pause"` (Teclas **P** o **B** en interfaz): Pausa el reloj de forma atómica bajo el mismo candado (`lock`) y devuelve el snapshot congelado para construir la tabla **BCP** reuniendo `nuevos`, `en_espera`, `en_ejecucion`, `bloqueados` y `terminados`.
+- `"continue"` (Tecla **C** en interfaz): Reanuda la simulación desde el estado pausado.
+- `"interrupt"` (Tecla **E** en interfaz): Envía el proceso en CPU a `bloqueados` durante 9 segundos simulados (`bloqueo_transcurrido` y `bloqueo_restante` incluidos en cada proceso bloqueado).
+- `"error"` (Tecla **W** en interfaz): Termina el proceso activo por error (`estado: "error"`, `resultado: null`, `finalizacion = reloj`).
+
+### 2. Reglas de Validación y Errores HTTP
+- **HTTP 200 / 201**: Operación exitosa; devuelve el snapshot completo con `simulacion_id`.
+- **HTTP 404**: `simulacion_id` no existe.
+- **HTTP 409 (`SimulationStateError`)**: Acción incompatible con el estado actual:
+  - Intentar `"add_process"`, `"interrupt"` o `"error"` cuando la simulación está en `"paused"`.
+  - Intentar `"interrupt"` o `"error"` cuando `en_ejecucion` es `null` (todos los residentes bloqueados).
+  - Intentar cualquier acción cuando la simulación está en `"completed"`.
+- **HTTP 422**: Cuerpo JSON inválido o nombre de acción desconocido.
+
+### 3. Ejemplos Reales de Estado en el Snapshot
+- **Proceso nuevo (memoria llena)**:
+  `{"id": 5, "operacion": "+", "operando_a": 4, "operando_b": 2, "tme": 8, "estado": "new", "resultado": null, "llegada": null, "primera_atencion": null, "finalizacion": null, "retorno": null, "respuesta": null, "espera": 0, "ejecutado": 0, "bloqueado": 0}`
+- **Proceso bloqueado**:
+  `{"id": 1, "estado": "blocked", "llegada": 0, "primera_atencion": 0, "finalizacion": null, "retorno": null, "respuesta": 0, "espera": 0, "ejecutado": 2, "bloqueado": 3, "bloqueo_transcurrido": 3, "bloqueo_restante": 6}`
+- **Proceso terminado normal / error**:
+  `{"id": 2, "estado": "finished", "resultado": 12, "llegada": 0, "primera_atencion": 2, "finalizacion": 9, "retorno": 9, "respuesta": 2, "espera": 2, "ejecutado": 7, "bloqueado": 0}`
+  *(En terminación por `"error"`, `estado` es `"error"` y `resultado` es `null`).*
