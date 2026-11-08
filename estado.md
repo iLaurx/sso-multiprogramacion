@@ -23,6 +23,10 @@ histórico y no describen la planificación actual.
 
 Última actualización: 8 de noviembre de 2026.
 
+El 8 de noviembre se agregó `docs/actividad-10-round-robin.md`, versión Markdown del PDF de planificación de la actividad 10. Es documentación de los cambios propuestos; en este paso no se modificó la aplicación ni se ejecutaron pruebas.
+
+También se agregó `docs/prompts-backend-round-robin.md`, con un prompt inicial para un orquestador de subagentes y cuatro pasos secuenciales para el motor. Son instrucciones propuestas; todavía no acreditan cambios ni pruebas del backend.
+
 ## Actividad 8: motor listo para integrar
 
 Autorización de esta tarea: se reemplazó el límite anterior a actividad 6 solo
