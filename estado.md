@@ -1,5 +1,12 @@
 # Estado del proyecto
 
+## README para público general
+
+Se reescribió `README.md` para explicar el propósito del simulador, sus estados,
+controles y cómo abrirlo. Se aclara que Round Robin todavía está pendiente de
+integración y verificación en la interfaz. Se revisaron los controles contra el
+código; no se ejecutaron pruebas porque solo cambió la documentación.
+
 ## Actividad 10: motor Round Robin
 
 En `feature/round-robin`, `simulation/engine.py` acepta un quantum entero

@@ -1,37 +1,34 @@
-# SSO · FCFS — Actividad 6
+# Simulador de planificación de procesos
 
-Simulador educativo de **Sistemas Operativos**, en adaptación de la aplicación de lotes a FCFS. Se conserva Python, FastAPI y HTML/CSS/JavaScript.
+Una herramienta educativa para observar cómo un sistema operativo organiza los procesos que necesitan utilizar la CPU. La simulación muestra sus cambios de estado, el uso de la memoria y los tiempos que acumula cada proceso.
 
-**Estado actual:** motor, API y frontend FCFS integrados localmente y comprobados en navegador con reloj real. Ver [estado.md](estado.md).
+## ¿Qué puedes observar?
 
-## Para el siguiente desarrollador
+Los procesos avanzan por cinco estados: **nuevos**, **listos**, **en ejecución**, **bloqueados** y **terminados**. Hasta tres procesos pueden permanecer en memoria al mismo tiempo; los demás esperan su ingreso. Un proceso bloqueado sigue ocupando su lugar hasta que regresa a la cola de listos.
 
-La integración está en `codex/integracion-fcfs-frontend`, basada en `feature/fcfs`. Antes de editar, comprobar la rama y los cambios locales; respetar el trabajo de los demás.
+Cada proceso realiza una operación aritmética y registra datos como su tiempo de llegada, espera, respuesta, ejecución y finalización. Puedes usar estos datos para comparar cómo cambia el recorrido de los procesos durante la simulación.
 
-1. [AGENTS.md](AGENTS.md): alcance y reglas de trabajo.
-2. [estado.md](estado.md): qué quedó terminado y qué sigue.
-3. [docs/entrega-motor.md](docs/entrega-motor.md): tareas de integración por área y criterios para comprobarlas.
-4. [docs/cambios-backend-fcfs.md](docs/cambios-backend-fcfs.md): métodos del motor, campos y snapshots reales.
-5. [docs/contrato-api.md](docs/contrato-api.md): rutas existentes, respuesta HTTP y diferencias con el contrato anterior.
+El proyecto se está adaptando a **Round Robin**, una forma de repartir la CPU por turnos. Cada turno tiene una duración máxima llamada *quantum*. Si un proceso no termina durante su turno, vuelve al final de la cola y continúa cuando le toque otra vez.
 
-[fcfs.md](fcfs.md) conserva las reglas. `Manual-instructions.md` es el manual anterior; los dos JSON en docs ya son ejemplos FCFS reproducibles.
+> **Estado actual:** el motor ya utiliza Round Robin con un quantum de un segundo por defecto. La pantalla y la comunicación con el motor aún están pendientes de adaptación y verificación: la interfaz todavía muestra textos de FCFS y no permite elegir ni visualizar el quantum.
 
-## Comportamiento del motor implementado
+## Cómo usar la simulación
 
-- FCFS con nuevos, listos, un proceso en CPU, bloqueados y terminados.
-- Máximo tres residentes: listos + CPU + bloqueados. Los demás esperan en nuevos.
-- Cuando termina un proceso, se admite al siguiente nuevo al final de listos.
-- I bloquea durante 10 segundos simulados, conserva servicio y memoria y después vuelve al final de listos.
-- E termina por error con el servicio real. P/C detienen y continúan todos los tiempos.
-- El reloj y los bloqueos avanzan con CPU libre; solo termina cuando todos los procesos han terminado.
-- Llegada al ingresar a memoria, primera atención, finalización, retorno, respuesta, espera, servicio y bloqueo separado. Los instantes desconocidos son null.
-- Snapshot independiente y serializable, sin campos públicos de lotes. La pantalla debe utilizar esos datos sin recalcular tiempos.
+Una vez abierta la aplicación, elige la cantidad inicial de procesos y selecciona **Iniciar emulación**. Durante la ejecución puedes usar los botones de la pantalla o sus teclas:
 
-Solo actividad 6. No agregar funciones de actividad 8 ni un selector entre motores.
+| Tecla | Acción |
+| --- | --- |
+| **N** | Agregar un proceso nuevo. |
+| **E** | Bloquear el proceso en ejecución durante nueve segundos simulados. |
+| **W** | Terminar el proceso en ejecución con error. |
+| **B** | Pausar la simulación y mostrar la tabla de procesos. |
+| **C** | Continuar la simulación. |
 
-## Ejecución local
+La barra espaciadora también permite alternar entre pausa y continuación. Los controles disponibles dependen del estado de la simulación y de si hay un proceso en ejecución.
 
-Requiere Python 3.12. Desde la raíz, en PowerShell:
+## Abrir la aplicación en tu computadora
+
+Necesitas **Python 3.12** y una terminal de PowerShell. Desde la carpeta del proyecto, ejecuta:
 
 ```powershell
 py -3.12 -m venv .venv
@@ -39,36 +36,10 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload
 ```
 
-Si ya existe un entorno instalado, basta con ejecutar Uvicorn. Aplicación: [http://127.0.0.1:8000](http://127.0.0.1:8000). Documentación HTTP: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). La interfaz muestra nuevos, listos, CPU, bloqueados y terminados con los tiempos del servidor.
+Después abre [la aplicación en tu navegador](http://127.0.0.1:8000). Si ya preparaste el entorno anteriormente, solo necesitas ejecutar el último comando.
 
-No requiere base de datos ni Node.js. Las simulaciones viven en memoria y se pierden al reiniciar el servidor, incluido un reinicio por `--reload`. Usar un solo worker. El servicio controla el reloj y la exclusión mutua por simulación; el motor no es seguro para acceso concurrente por sí solo.
+Las simulaciones se guardan temporalmente: al detener o reiniciar la aplicación se pierden sus datos.
 
-## Pruebas
+## Sobre el proyecto
 
-Suite completa:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q
-```
-
-Motor y ejemplos documentados:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q tests/test_engine.py tests/test_models.py tests/test_times.py tests/test_snapshot_fcfs.py tests/test_fcfs_handoff.py
-```
-
-Motor: 79 pruebas aprobadas; API/servicio: 23; suite completa: 105. El recorrido de navegador FCFS también se comprobó localmente. Ver [estado.md](estado.md).
-
-Recorrido de navegador opcional (requiere Playwright instalado y Chrome local o Chromium de Playwright): con el servidor iniciado, ejecutar `python tests/browser_fcfs.py http://127.0.0.1:8000` usando el intérprete del entorno. Usa segundos reales, genera evidencia en `tmp/fcfs-browser/` y no añade dependencias de navegador al servidor.
-
-## Estructura
-
-| Carpeta | Responsabilidad |
-| --- | --- |
-| `simulation/` | Motor FCFS, modelo y generación. Entregado. |
-| `backend/` | Rutas, validaciones, servicio y reloj. Integración comprobada localmente. |
-| `frontend/` | Interfaz y controles. FCFS integrado y comprobado localmente. |
-| `tests/` | Pruebas de motor, API, servicio y archivos estáticos. |
-| `docs/` | Contrato, entrega y ejemplos del motor. |
-
-La entrega del motor hasta `383a46f` se publicó en `origin/feature/fcfs`. El [sitio existente en Render](https://sso-multiprogramacion.onrender.com/) es una referencia del despliegue anterior: no se verificó ni desplegó FCFS allí en esta entrega.
+Este simulador forma parte de actividades de la materia **Sistemas Operativos**. Su propósito es ayudar a comprender, mediante una representación visual, cómo se comparten la CPU y la memoria y cómo afectan las interrupciones al recorrido de los procesos.
