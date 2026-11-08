@@ -21,9 +21,13 @@ class SimulationEngine:
 
     # * Genera los trabajos, admite hasta tres en memoria y despacha el primer proceso en tiempo cero.
     # ? Recibe cantidad y semilla; la validación de ambas se delega al generador.
-    def __init__(self, numero_trabajos: int, seed: int | None = None):
+    def __init__(self, numero_trabajos: int, seed: int | None = None, *, quantum: int = 1):
+        if type(quantum) is not int or quantum <= 0:
+            raise ValueError("El quantum debe ser un entero positivo")
         if seed is not None and type(seed) is not int:
             raise ValueError("La semilla debe ser un entero o None")
+        self.quantum = quantum
+        self._turn_elapsed = 0
         self._rng = Random(seed)
         processes = generate_processes(numero_trabajos, seed, rng=self._rng)
         self._next_id = numero_trabajos + 1
@@ -43,9 +47,11 @@ class SimulationEngine:
     # * Punto de entrada público para construir y devolver una nueva simulación.
     # ? @classmethod recibe la clase en cls y llama a su constructor con cantidad y semilla.
     @classmethod
-    def create(cls, numero_trabajos: int, seed: int | None = None) -> "SimulationEngine":
+    def create(
+        cls, numero_trabajos: int, seed: int | None = None, *, quantum: int = 1
+    ) -> "SimulationEngine":
         """Construye una simulación running en tiempo cero."""
-        return cls(numero_trabajos, seed)
+        return cls(numero_trabajos, seed, quantum=quantum)
 
     @property
     def memoria_ocupada(self) -> int:
@@ -73,11 +79,12 @@ class SimulationEngine:
             self._queue.append(process)
 
     def _dispatch(self) -> None:
-        """Admite y despacha en FCFS; no desaloja un proceso activo."""
+        """Admite y despacha desde la cola FIFO; no desaloja un proceso activo."""
         self._admit()
         if self._current is None and self._queue:
             self._current = self._queue.popleft()
             self._current.estado = "running"
+            self._turn_elapsed = 0
             if self._current.primera_atencion is None:
                 self._current.primera_atencion = self.clock
         if self._current is None and not self._new and not self._queue and not self._blocked:
@@ -109,6 +116,7 @@ class SimulationEngine:
         self.clock += 1
         if process is not None:
             process.ejecutado += 1
+            self._turn_elapsed += 1
             if process.ejecutado == process.tme:
                 process.resultado = calculate(process.operacion, process.operando_a, process.operando_b)
                 process.estado = "finished"
@@ -122,6 +130,14 @@ class SimulationEngine:
                 blocked.inicio_bloqueo = None
                 blocked.estado = "ready"
                 self._queue.append(blocked)
+        # Los desbloqueados se incorporan antes que el proceso cuyo turno vence
+        # en este mismo segundo, detrás de quienes ya esperaban.
+        if self._current is not None and self._turn_elapsed >= self.quantum:
+            self._current.estado = "ready"
+            self._queue.append(self._current)
+            self._current = None
+        if self._current is None:
+            self._turn_elapsed = 0
         # Si coinciden desbloqueo y finalización, el desbloqueado se encola
         # antes del nuevo admitido, siempre detrás de los listos existentes.
         self._dispatch()
@@ -134,6 +150,7 @@ class SimulationEngine:
         process.inicio_bloqueo = self.clock
         self._blocked.append(process)
         self._current = None
+        self._turn_elapsed = 0
         self._dispatch()
 
     # * Guarda el actual como error (W en actividad 8) y permite que siga el próximo.
@@ -146,6 +163,7 @@ class SimulationEngine:
         process.resultado = None
         self._finished.append(process)
         self._current = None
+        self._turn_elapsed = 0
         self._dispatch()
 
     # * Aplica P: cambia el motor a paused para que los siguientes ticks no avancen.
@@ -164,13 +182,15 @@ class SimulationEngine:
         self.status = "running"
 
     # * Reúne el estado del motor y las copias de sus procesos en un diccionario nuevo.
-    # ? en_espera conserva su nombre y representa la cola de listos en orden FCFS.
+    # ? en_espera conserva su nombre y representa la cola de listos en orden FIFO.
     # ! Solo lee el estado: no llama tick ni devuelve referencias a los procesos internos.
     def snapshot(self) -> dict:
         """Copia serializable; no avanza tiempo ni expone objetos internos."""
         return {
             "estado": self.status,
             "reloj": self.clock,
+            "quantum": self.quantum,
+            "tiempo_turno": self._turn_elapsed if self._current is not None else None,
             "nuevos": [process.snapshot() for process in self._new],
             "bloqueados": [
                 {

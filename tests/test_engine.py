@@ -43,6 +43,23 @@ def test_invalid_seed(invalid):
         SimulationEngine.create(1, seed=invalid)
 
 
+@pytest.mark.parametrize("invalid", [0, -1, True, False, 2.5, 2.0, "3", None])
+def test_invalid_quantum(invalid):
+    with pytest.raises(ValueError, match="quantum.*entero positivo"):
+        SimulationEngine.create(1, quantum=invalid)
+
+
+def test_quantum_is_stored_and_exposed():
+    engine = SimulationEngine.create(3, 123, quantum=2)
+    assert engine.quantum == 2
+    assert engine._turn_elapsed == 0
+    assert engine.snapshot()["quantum"] == 2
+    for _ in range(3):
+        engine.tick()
+    assert engine.snapshot()["en_ejecucion"]["id"] == 2
+    assert SimulationEngine.create(1, 123).quantum == 1
+
+
 # * Comprueba rangos, operaciones, divisores válidos y repetibilidad con la misma semilla.
 # ? Compara el estado aleatorio global antes y después para detectar cambios ajenos al motor.
 def test_random_generation_is_valid_and_local():

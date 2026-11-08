@@ -1,6 +1,27 @@
 # Estado del proyecto
 
-Última actualización: 4 de noviembre de 2026.
+## Actividad 10: motor Round Robin
+
+En `feature/round-robin`, `simulation/engine.py` acepta un quantum entero
+positivo, conserva el servicio entre turnos y expone `quantum` y `tiempo_turno`
+en el snapshot (este último es null con CPU libre). El quantum predeterminado
+es 1; corresponde al equipo de API decidir si lo exige al crear la simulación.
+Si coinciden desbloqueo y vencimiento, el desbloqueado entra antes que el
+proceso desalojado. La finalización tiene prioridad sobre el fin del turno.
+
+Se actualizaron `tests/conftest.py`, `tests/test_engine.py`,
+`tests/test_snapshot_fcfs.py`, `tests/test_times.py` y se agregó
+`tests/test_round_robin.py`. La entrega y cuatro ejemplos reproducibles están
+en `docs/entrega-motor-round-robin.md`. Las 114 pruebas del motor aprobaron y
+`git diff --check` no señaló errores. Se intentó la suite completa, pero no
+produjo salida y se interrumpió; no se acredita su resultado.
+
+Queda integrar y verificar API, servicio y frontend: el servicio todavía no
+recibe el quantum elegido y utiliza el valor predeterminado. No se modificaron
+esas áreas. Los apartados anteriores de actividad 8 se conservan como contexto
+histórico y no describen la planificación actual.
+
+Última actualización: 8 de noviembre de 2026.
 
 ## Actividad 8: motor listo para integrar
 
