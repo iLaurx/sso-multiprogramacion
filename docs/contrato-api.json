@@ -2,6 +2,8 @@
   "simulacion_id": "a3f25ef5-582d-4dca-8726-0e5eb23469e8",
   "estado": "running",
   "reloj": 0,
+  "quantum": 1,
+  "tiempo_turno": 0,
   "nuevos": [
     {
       "id": 4,

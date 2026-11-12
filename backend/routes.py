@@ -7,7 +7,11 @@ router = APIRouter(prefix="/api/simulations", tags=["Simulaciones"])
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def crear_simulacion(datos: CrearSimulacion, request: Request):
     service = request.app.state.service
-    return await service.create(numero_trabajos=datos.numero_trabajos, seed=datos.seed)
+    return await service.create(
+        numero_trabajos=datos.numero_trabajos,
+        seed=datos.seed,
+        quantum=datos.quantum,
+    )
 
 @router.get("/{simulacion_id}")
 async def obtener_simulacion(simulacion_id: str, request: Request):

@@ -27,8 +27,12 @@ class SimulationService:
                 if registro.motor.status == "completed":
                     break
 
-    async def create(self, numero_trabajos: int, seed: int | None = None) -> dict:
-        motor = SimulationEngine.create(numero_trabajos=numero_trabajos, seed=seed)
+    async def create(
+        self, numero_trabajos: int, seed: int | None = None, *, quantum: int = 1
+    ) -> dict:
+        motor = SimulationEngine.create(
+            numero_trabajos=numero_trabajos, seed=seed, quantum=quantum
+        )
         simulacion_id = str(uuid.uuid4())
         lock = asyncio.Lock()
 
