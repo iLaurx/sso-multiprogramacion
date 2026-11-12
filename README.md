@@ -8,20 +8,20 @@ Los procesos avanzan por cinco estados: **nuevos**, **listos**, **en ejecución*
 
 Cada proceso realiza una operación aritmética y registra datos como su tiempo de llegada, espera, respuesta, ejecución y finalización. Puedes usar estos datos para comparar cómo cambia el recorrido de los procesos durante la simulación.
 
-El proyecto se está adaptando a **Round Robin**, una forma de repartir la CPU por turnos. Cada turno tiene una duración máxima llamada *quantum*. Si un proceso no termina durante su turno, vuelve al final de la cola y continúa cuando le toque otra vez.
+El simulador usa **Round Robin**, una forma de repartir la CPU por turnos. Cada turno tiene una duración máxima llamada *quantum*. Si un proceso no termina durante su turno, vuelve al final de la cola y continúa cuando le toque otra vez.
 
-> **Estado actual:** el motor ya utiliza Round Robin con un quantum de un segundo por defecto. La pantalla y la comunicación con el motor aún están pendientes de adaptación y verificación: la interfaz todavía muestra textos de FCFS y no permite elegir ni visualizar el quantum.
+> **Estado actual:** al iniciar, la pantalla solicita un quantum entero positivo y muestra el quantum elegido, el turno actual, el servicio acumulado y el tiempo restante. Los tiempos y el orden de las colas se leen de la respuesta del servidor.
 
 ## Cómo usar la simulación
 
-Una vez abierta la aplicación, elige la cantidad inicial de procesos y selecciona **Iniciar emulación**. Durante la ejecución puedes usar los botones de la pantalla o sus teclas:
+Una vez abierta la aplicación, elige la cantidad inicial de procesos y el quantum, y selecciona **Iniciar emulación**. Durante la ejecución puedes usar los botones de la pantalla o sus teclas:
 
 | Tecla | Acción |
 | --- | --- |
 | **N** | Agregar un proceso nuevo. |
 | **E** | Bloquear el proceso en ejecución durante nueve segundos simulados. |
 | **W** | Terminar el proceso en ejecución con error. |
-| **B** | Pausar la simulación y mostrar la tabla de procesos. |
+| **P / B** | Pausar la simulación y mostrar la tabla de procesos. |
 | **C** | Continuar la simulación. |
 
 La barra espaciadora también permite alternar entre pausa y continuación. Los controles disponibles dependen del estado de la simulación y de si hay un proceso en ejecución.
