@@ -1,4 +1,4 @@
-// Interfaz de simulación FCFS; el servidor conserva la autoridad de estados y tiempos.
+// Interfaz de simulación Round Robin; el servidor conserva la autoridad de estados y tiempos.
 
 const API = "/api";
 const ENDPOINT_HEALTH = "/api/health"; // Requerido para verificación en pytest
@@ -7,6 +7,8 @@ const elementos = {
   estadoApi: document.querySelector("#estadoApi"),
   apiDot: document.querySelector("#apiDot"),
   numeroTrabajos: document.querySelector("#numeroTrabajos"),
+  quantum: document.querySelector("#quantum"),
+  quantumElegido: document.querySelector("#quantumElegido"),
   btnIniciar: document.querySelector("#btnIniciar"),
   btnIniciarEmulacion: document.querySelector("#btnIniciarEmulacion"),
   btnAddProcess: document.querySelector("#btnAddProcess"),
@@ -156,7 +158,7 @@ function textoEstado(proceso, estadoLista) {
   return ({ new: "Nuevo", ready: "Listo", running: "En CPU", blocked: "Bloqueado", finished: "Terminado", error: "Terminado · ERROR" })[estadoLista] || estadoLista;
 }
 
-function dibujarColumna(contenedor, procesos, estado, vacio) {
+function dibujarColumna(contenedor, procesos, estado, vacio, snapshot) {
   if (!contenedor) return;
   const tarjetaCpu = estado === "running" && procesos.length === 1
     ? contenedor.querySelector(`[data-cpu-id="${procesos[0].id}"]`) : null;
@@ -178,7 +180,7 @@ function dibujarColumna(contenedor, procesos, estado, vacio) {
       : estado === "finished"
         ? (esError ? "ERROR" : `Resultado: ${mostrarValor(proceso.resultado, "")}`)
         : estado === "running"
-          ? `TME ${mostrarValor(proceso.tme)} · servicio ${mostrarValor(proceso.ejecutado)} · restante ${mostrarValor(proceso.restante)}`
+          ? `Turno ${mostrarValor(snapshot.tiempo_turno)} / ${mostrarValor(snapshot.quantum)} · servicio ${mostrarValor(proceso.ejecutado)} · restante ${mostrarValor(proceso.restante)}`
           : `TME ${mostrarValor(proceso.tme)} · restante ${mostrarValor(proceso.restante)}`;
     if (estado === "running") {
       tarjeta.dataset.cpuId = proceso.id;
@@ -198,11 +200,11 @@ function dibujarColumna(contenedor, procesos, estado, vacio) {
         tarjeta.append(texto, etiqueta, barra);
       }
       tarjeta.querySelector(".cpu-texto").textContent = `P${proceso.id} · ${formatearOperacion(proceso)} · ${detalle}`;
-      tarjeta.querySelector(".cpu-progreso-texto").textContent = `Faltan ${mostrarValor(proceso.restante)} · ${mostrarValor(proceso.ejecutado)} de ${mostrarValor(proceso.tme)}`;
+      tarjeta.querySelector(".cpu-progreso-texto").textContent = `Turno ${mostrarValor(snapshot.tiempo_turno)} de ${mostrarValor(snapshot.quantum)} · faltan ${mostrarValor(proceso.restante)} · ${mostrarValor(proceso.ejecutado)} de ${mostrarValor(proceso.tme)}`;
       const barra = tarjeta.querySelector(".cpu-progreso");
       barra.setAttribute("aria-valuemax", proceso.tme);
       barra.setAttribute("aria-valuenow", proceso.ejecutado);
-      barra.setAttribute("aria-valuetext", `${proceso.ejecutado} de ${proceso.tme} segundos ejecutados; faltan ${proceso.restante} segundos`);
+      barra.setAttribute("aria-valuetext", `turno ${snapshot.tiempo_turno} de quantum ${snapshot.quantum}; ${proceso.ejecutado} de ${proceso.tme} segundos ejecutados; faltan ${proceso.restante} segundos`);
       const porcentaje = proceso.tme > 0 ? Math.min(100, Math.max(0, proceso.ejecutado / proceso.tme * 100)) : 0;
       barra.firstElementChild.style.width = `${porcentaje}%`;
     } else {
@@ -216,16 +218,16 @@ function renderizarDiagrama(snapshot, listas) {
   const idle = snapshot.estado === "completed" ? "Todos los procesos terminaron."
     : snapshot.estado === "paused" ? "CPU libre; simulación pausada."
     : listas.bloqueados.length ? "CPU libre; los bloqueos siguen avanzando." : "Esperando proceso listo.";
-  dibujarColumna(elementos.estadoNuevos, listas.nuevos, "new", "Sin procesos nuevos.");
-  dibujarColumna(elementos.estadoListos, listas.listos, "ready", "Sin procesos listos.");
-  dibujarColumna(elementos.estadoCpu, listas.cpu, "running", listas.cpu.length ? "" : idle);
-  dibujarColumna(elementos.estadoBloqueados, listas.bloqueados, "blocked", "Sin procesos bloqueados.");
-  dibujarColumna(elementos.estadoTerminados, listas.terminados, "finished", "Sin procesos terminados.");
+  dibujarColumna(elementos.estadoNuevos, listas.nuevos, "new", "Sin procesos nuevos.", snapshot);
+  dibujarColumna(elementos.estadoListos, listas.listos, "ready", "Sin procesos listos.", snapshot);
+  dibujarColumna(elementos.estadoCpu, listas.cpu, "running", listas.cpu.length ? "" : idle, snapshot);
+  dibujarColumna(elementos.estadoBloqueados, listas.bloqueados, "blocked", "Sin procesos bloqueados.", snapshot);
+  dibujarColumna(elementos.estadoTerminados, listas.terminados, "finished", "Sin procesos terminados.", snapshot);
 
   if (elementos.detalleEjecucion) {
     const cpu = snapshot.en_ejecucion;
     elementos.detalleEjecucion.textContent = cpu
-      ? `P${cpu.id} · ${formatearOperacion(cpu)} · TME ${mostrarValor(cpu.tme)} · servicio ${mostrarValor(cpu.ejecutado)} · restante ${mostrarValor(cpu.restante)}`
+      ? `P${cpu.id} · ${formatearOperacion(cpu)} · turno ${mostrarValor(snapshot.tiempo_turno)} / ${mostrarValor(snapshot.quantum)} · servicio ${mostrarValor(cpu.ejecutado)} · restante ${mostrarValor(cpu.restante)}`
       : idle;
   }
 
@@ -254,7 +256,7 @@ function renderizarTablaProcesos(listas) {
     elementos.tbodyResumen.appendChild(fila);
     return;
   }
-  const campos = ["llegada", "primera_atencion", "finalizacion", "retorno", "respuesta", "espera", "ejecutado", "bloqueo_transcurrido", "bloqueado"];
+  const campos = ["llegada", "primera_atencion", "finalizacion", "retorno", "respuesta", "espera", "ejecutado", "bloqueo_restante", "bloqueado"];
   procesos.forEach(proceso => {
     const fila = document.createElement("tr");
     const error = proceso.estado === "error";
@@ -282,6 +284,7 @@ function registrarTransiciones(snapshot, listas) {
     if (!antes && (ahora === "ready" || ahora === "running")) registrarEvento(`${id} entra a memoria.`);
     else if (antes === "new" && ahora === "ready") registrarEvento(`${id} entra a memoria y pasa a listos.`);
     else if (antes === "ready" && ahora === "running") registrarEvento(`${id} toma la CPU.`);
+    else if (antes === "running" && ahora === "ready") registrarEvento(`${id} agota su quantum y vuelve al final de listos.`);
     else if (antes === "running" && ahora === "blocked") registrarEvento(`${id} se bloquea por E/S durante 9 segundos simulados.`);
     else if (antes === "blocked" && ahora === "ready") registrarEvento(`${id} termina E/S y regresa al final de listos.`);
     else if (antes === "blocked" && ahora === "running") registrarEvento(`${id} termina E/S, regresa a listos y toma la CPU.`);
@@ -310,9 +313,10 @@ function renderizar(snapshot) {
   if (elementos.cantidadNuevos) elementos.cantidadNuevos.textContent = cantidadNuevos;
   if (elementos.totalTrabajos) elementos.totalTrabajos.textContent = snapshot.total_trabajos ?? "—";
   if (elementos.metricTerminados) elementos.metricTerminados.textContent = listas.terminados.length;
+  if (elementos.quantumElegido) elementos.quantumElegido.textContent = mostrarValor(snapshot.quantum, "");
   if (elementos.estadoSimulacion) elementos.estadoSimulacion.textContent = snapshot.estado;
   if (elementos.ayudaInterrupcion) {
-    elementos.ayudaInterrupcion.textContent = "N: agrega un proceso · E: bloquea por E/S (9 s) · W: termina con ERROR · B: pausa · C: continúa.";
+    elementos.ayudaInterrupcion.textContent = "N: agrega un proceso · E: bloquea por E/S (9 s) · W: termina con ERROR · P/B: pausa y muestra la tabla · C: continúa.";
   }
 
   registrarTransiciones(snapshot, listas);
@@ -330,7 +334,7 @@ function renderizar(snapshot) {
     if (isCompleted) elementos.estadoControles.textContent = "Simulación finalizada. El resumen queda disponible.";
     else if (isPaused) elementos.estadoControles.textContent = "Simulación pausada. Tabla completa disponible; pulsa C para continuar.";
     else if (isRunning && !hayCpu && listas.bloqueados.length) elementos.estadoControles.textContent = "CPU libre; el reloj atiende los bloqueos. Pulsa B para pausar y revisar la tabla.";
-    else if (isRunning) elementos.estadoControles.textContent = "N agrega un proceso · E bloquea por E/S · W termina con error · B pausa · C continúa.";
+    else if (isRunning) elementos.estadoControles.textContent = "N agrega un proceso · E bloquea por E/S · W termina con error · P/B pausa y muestra la tabla · C continúa.";
     else elementos.estadoControles.textContent = "Inicia una simulación para habilitar los controles.";
   }
   actualizarControles();
@@ -353,7 +357,7 @@ function limpiarSimulacion() {
   estadosAnteriores = new Map();
   estadoSimulacionAnterior = null;
   renderizar({
-    estado: "sin iniciar", reloj: 0, total_trabajos: 0,
+    estado: "sin iniciar", reloj: 0, quantum: null, tiempo_turno: null, total_trabajos: 0,
     nuevos: [], en_espera: [], en_ejecucion: null, bloqueados: [], terminados: [], memoria_ocupada: 0
   });
   snapshotActual = null;
@@ -411,6 +415,7 @@ function ejecutarExclusivo(trabajo) {
 async function iniciarSimulacion() {
   if (ocupado || (simulacionId && snapshotActual?.estado !== "completed")) return;
   const cantidad = Number(elementos.numeroTrabajos.value);
+  const quantum = Number(elementos.quantum.value);
 
   if (
     elementos.numeroTrabajos.value.trim() === "" ||
@@ -421,13 +426,23 @@ async function iniciarSimulacion() {
     return;
   }
 
+  if (
+    elementos.quantum.value.trim() === "" ||
+    !Number.isSafeInteger(quantum) ||
+    quantum <= 0
+  ) {
+    mostrarMensaje("Introduce un quantum entero positivo.");
+    elementos.quantum.focus();
+    return;
+  }
+
   await ejecutarExclusivo(async () => {
     detenerConsultas();
     mostrarMensaje("Creando simulación...");
 
     const datos = await solicitar("/simulations", {
       method: "POST",
-      body: JSON.stringify({ numero_trabajos: cantidad })
+      body: JSON.stringify({ numero_trabajos: cantidad, quantum })
     });
 
     simulacionId = datos.simulacion_id;
@@ -437,7 +452,7 @@ async function iniciarSimulacion() {
     estadosAnteriores = new Map();
     estadoSimulacionAnterior = null;
     historialLog = [];
-    registrarEvento(`Simulación iniciada con ${cantidad} trabajos iniciales.`);
+    registrarEvento(`Simulación iniciada con ${cantidad} trabajos iniciales y quantum ${quantum}.`);
 
     renderizar(datos);
     mostrarMensaje("Simulación creada correctamente.");
@@ -515,7 +530,7 @@ document.addEventListener("keydown", event => {
   }
 
   // Enter para iniciar simulación si estamos en el campo de trabajos
-  if (event.key === "Enter" && document.activeElement === elementos.numeroTrabajos) {
+  if (event.key === "Enter" && [elementos.numeroTrabajos, elementos.quantum].includes(document.activeElement)) {
     event.preventDefault();
     iniciarSimulacion().catch(error => {
       mostrarMensaje(`Error: ${mostrarError(error)}`);
@@ -546,6 +561,7 @@ document.addEventListener("keydown", event => {
     n: "add_process",
     e: "interrupt",
     w: "error",
+    p: "pause",
     b: "pause",
     c: "continue"
   };
@@ -602,7 +618,7 @@ async function iniciarFrontend() {
     await recuperarSimulacion();
   } else {
     renderizar({
-      estado: "sin iniciar", reloj: 0, total_trabajos: 0,
+      estado: "sin iniciar", reloj: 0, quantum: null, tiempo_turno: null, total_trabajos: 0,
       nuevos: [], en_espera: [], en_ejecucion: null, bloqueados: [], terminados: [], memoria_ocupada: 0
     });
   }

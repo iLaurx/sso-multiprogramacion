@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Simulador de procesos FCFS</title>
+  <title>Simulador de procesos Round Robin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -224,7 +224,7 @@
     /* Cuadrícula de Métricas Superiores */
     .metrics-row {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 16px;
     }
 
@@ -752,7 +752,6 @@
 
     /* Responsividad */
     @media (max-width: 900px) {
-      .metrics-row,
       .tables-row {
         grid-template-columns: 1fr;
       }
@@ -782,10 +781,10 @@
         <div>
           <h1 class="hero-title">
             Simulador<br>
-            <span class="hero-subtitle">FCFS</span>
+            <span class="hero-subtitle">Round Robin</span>
           </h1>
           <p class="hero-desc">
-            La CPU atiende los procesos en orden de llegada. Sigue sus cinco estados, el uso de memoria, los bloqueos de E/S y sus tiempos.
+            Los procesos comparten la CPU por turnos definidos por el quantum. Sigue la cola de listos, los cinco estados, los bloqueos y sus tiempos.
           </p>
         </div>
         <div class="api-pill">
@@ -802,6 +801,11 @@
             <input type="number" id="numeroTrabajos" min="1" max="100" step="1" value="6">
           </div>
 
+          <div class="config-field">
+            <label class="config-label" for="quantum">Quantum (segundos)</label>
+            <input type="number" id="quantum" min="1" step="1" value="3" required>
+          </div>
+
           <button id="btnIniciar" class="btn-generate">
             <svg class="icon-svg" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2">
               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
@@ -812,7 +816,7 @@
         </div>
 
         <div class="config-note">
-          procesos aleatorios · TME de 7 a 18 s · máximo 3 en memoria
+          procesos aleatorios · quantum entero positivo · TME de 7 a 18 s · máximo 3 en memoria
         </div>
 
         <div id="mensaje" role="status" aria-live="polite">
@@ -842,26 +846,31 @@
         <span class="metric-title">TERMINADOS</span>
         <div class="metric-value"><span id="metricTerminados">0</span> / <span id="totalTrabajos">0</span></div>
       </div>
+
+      <div class="metric-card">
+        <span class="metric-title">QUANTUM ELEGIDO</span>
+        <div class="metric-value cyan"><span id="quantumElegido">—</span> s</div>
+      </div>
     </section>
 
     <!-- Diagrama Principal: Blueprint Flow (Imagen 1) -->
     <section class="diagram-panel">
       <div>
         <div class="diagram-tag">COLA → CPU → RESULTADOS</div>
-        <h2 class="diagram-title">Estados de los procesos · FCFS</h2>
-        <p class="diagram-subtitle">La CPU toma el primero de listos. La memoria admite hasta tres procesos; los bloqueados siguen ocupándola.</p>
+        <h2 class="diagram-title">Estados de los procesos · Round Robin</h2>
+        <p class="diagram-subtitle">Al agotarse su quantum, un proceso pendiente vuelve al final de listos. La memoria admite hasta tres procesos; los bloqueados siguen ocupándola.</p>
       </div>
 
       <div class="state-grid" aria-label="Colas por estado de proceso">
         <section class="state-column"><h3>NUEVOS · fuera de memoria</h3><div id="estadoNuevos" class="state-list"></div></section>
-        <section class="state-column"><h3>LISTOS · orden FCFS</h3><div id="estadoListos" class="state-list"></div></section>
+        <section class="state-column"><h3>LISTOS · orden de turno</h3><div id="estadoListos" class="state-list"></div></section>
         <section class="state-column"><h3>CPU · ejecución</h3><div id="estadoCpu" class="state-list"></div></section>
         <section class="state-column"><h3>BLOQUEADOS · E/S</h3><div id="estadoBloqueados" class="state-list"></div></section>
         <section class="state-column"><h3>TERMINADOS</h3><div id="estadoTerminados" class="state-list"></div></section>
       </div>
 
       <div class="diagram-footer-text">
-        <span id="ayudaInterrupcion">N: agrega un proceso · E: bloquea por E/S (9 s) · W: termina con ERROR · B: pausa · C: continúa.</span>
+        <span id="ayudaInterrupcion">N: agrega un proceso · E: bloquea por E/S (9 s) · W: termina con ERROR · P/B: pausa y muestra la tabla · C: continúa.</span>
       </div>
 
       <!-- Detalle de Ejecución en Línea -->
@@ -889,8 +898,8 @@
           <kbd>W</kbd> Error
         </button>
 
-        <button id="btnPause" class="btn-ctrl cyan-btn" data-action="pause" title="Pausar simulación y mostrar la tabla" disabled>
-          <kbd>B</kbd> Pausa
+        <button id="btnPause" class="btn-ctrl cyan-btn" data-action="pause" title="P o B: pausar la simulación y mostrar la tabla" disabled>
+          <kbd>P / B</kbd> Pausa y tabla
         </button>
 
         <button id="btnContinue" class="btn-ctrl cyan-btn" data-action="continue" title="Continuar simulación" disabled>
@@ -928,7 +937,7 @@
               <th>Respuesta</th>
               <th>Espera</th>
               <th>Servicio</th>
-              <th>Bloqueo actual</th>
+              <th>Bloqueo restante</th>
               <th>Bloqueo acumulado</th>
             </tr>
           </thead>

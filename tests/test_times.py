@@ -125,7 +125,7 @@ def test_snapshot_exposes_times_and_reads_do_not_change_them(known_engine):
     snapshot = engine.snapshot()
     assert set(snapshot) == {
         "estado", "reloj", "nuevos", "bloqueados", "memoria_ocupada",
-        "total_trabajos", "en_ejecucion", "en_espera", "terminados",
+        "total_trabajos", "en_ejecucion", "en_espera", "terminados", "quantum", "tiempo_turno",
     }
     visible = [snapshot["en_ejecucion"], *snapshot["en_espera"],
                *snapshot["bloqueados"], *snapshot["nuevos"], *snapshot["terminados"]]

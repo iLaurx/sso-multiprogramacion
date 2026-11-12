@@ -1,6 +1,8 @@
 {
   "estado": "running",
   "reloj": 0,
+  "quantum": 1,
+  "tiempo_turno": 0,
   "nuevos": [
     {
       "id": 4,
